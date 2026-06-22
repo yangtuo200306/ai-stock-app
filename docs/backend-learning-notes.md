@@ -191,15 +191,23 @@ Pushed = 本地提交已经同步到 GitHub
 - `8000` 是后端服务监听的端口。
 - `feat: add FastAPI health endpoint` 不是单独运行的命令，而是 `git commit -m` 后面的提交信息。
 
-### 下一步建议
+## 2026-06-22：GET /api/stocks 自选股列表接口
 
-下一步可以学习并实现第二个最小接口：
+### 今天完成了什么
+
+- 新增了自选股接口文件 `backend/app/api/stocks.py`。
+- 在 `backend/app/main.py` 中注册了 `stocks_router`。
+- 实现了 `GET /api/stocks`。
+- 本地验证 `GET /api/health` 和 `GET /api/stocks` 都能正常返回。
+- 完成 Git 提交并推送到 GitHub。
+
+### 当前新增接口
 
 ```text
 GET /api/stocks
 ```
 
-第一版先不连接数据库，只返回空列表：
+当前返回：
 
 ```json
 {
@@ -207,9 +215,113 @@ GET /api/stocks
 }
 ```
 
-这样可以继续学习：
+### 核心概念
 
-- 如何新增一个接口文件；
-- 如何注册多个 router；
-- 什么是列表数据；
-- 为什么真实项目常先 mock，再接数据库。
+#### 自选股接口
+
+`GET /api/stocks` 是给手机 APP 自选股页面使用的。
+
+页面以后可以通过这个接口向后端询问：
+
+```text
+当前有哪些自选股？
+```
+
+#### 空列表
+
+当前返回：
+
+```json
+{
+  "items": []
+}
+```
+
+表示：
+
+```text
+请求成功，但现在还没有自选股数据。
+```
+
+空列表不是错误。
+
+#### mock / 占位接口
+
+现在还没有数据库，也没有真实股票数据，所以先返回空列表。
+
+这属于 mock / 占位接口：
+
+```text
+先把接口通道建好，后面再接真实数据。
+```
+
+#### 多 router 注册
+
+`stocks.py` 中定义自选股相关接口。
+
+`main.py` 中通过下面方式注册：
+
+```text
+app.include_router(stocks_router)
+```
+
+可以理解为：
+
+```text
+stocks.py 定义接口
+main.py 把接口挂到 FastAPI 主应用上
+```
+
+### 本次遇到的问题
+
+验证时遇到过：
+
+```text
+8000 端口被旧服务占用
+```
+
+表现是：
+
+```text
+旧的 /api/health 可以访问
+新的 /api/stocks 返回 404
+```
+
+原因是浏览器访问到的还是旧服务，不是刚修改后的新版服务。
+
+解决方式：
+
+```text
+先停止旧服务，再重新启动新版服务。
+```
+
+### Git 学习记录
+
+本次提交：
+
+```text
+0d9a665 feat: add stocks list endpoint
+```
+
+学到：
+
+```text
+新增接口时，定义接口文件和注册入口文件通常要一起提交。
+```
+
+本次涉及文件：
+
+```text
+backend/app/api/stocks.py
+backend/app/main.py
+```
+
+### 下一步建议
+
+下一步可以继续做自选股相关功能：
+
+```text
+POST /api/stocks
+```
+
+第一版可以先学习如何接收前端传来的股票代码和名称，暂时仍不接数据库。
