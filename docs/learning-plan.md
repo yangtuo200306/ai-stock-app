@@ -215,6 +215,30 @@ APP 查看历史报告
 - 任务完成后进入报告详情。
 - 历史页能查看报告。
 
+当前已完成（移动端第一阶段）：
+
+- 创建 Expo + React Native + TypeScript 项目骨架。
+- 使用 Expo Web 预览。
+- 设置页：输入后端地址、保存到 AsyncStorage、测试 `/api/health`。
+- 后端增加 CORS 配置。
+- 首页：读取 `/api/stocks`、FlatList 展示、加载/失败/空列表状态。
+- 引入 React Navigation 底部 Tab 导航。
+- 页面拆分为独立 Screen。
+- `App.tsx` 简化为 APP 入口。
+
+当前移动端结构：
+
+```text
+mobile-app/
+  App.tsx
+  src/
+    navigation/
+      AppNavigator.tsx
+    screens/
+      HomeScreen.tsx
+      SettingsScreen.tsx
+```
+
 ### 阶段 5：接入真实能力
 
 第一版闭环完成后，再逐步学习并接入：
