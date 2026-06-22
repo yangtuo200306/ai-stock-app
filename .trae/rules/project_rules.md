@@ -81,6 +81,9 @@ d:/ai-stock-analysis/stock-analysis-reference
 - mock 分析任务小闭环；
 - `POST /api/analysis` 创建分析任务；
 - `GET /api/analysis/{task_id}` 查询分析任务状态；
+- mock 报告闭环；
+- `GET /api/reports` 查询历史报告；
+- `GET /api/reports/{report_id}` 查询报告详情；
 - 本地验证成功；
 - Git 提交并推送成功；
 - 后端学习笔记文件已更新。

@@ -708,3 +708,37 @@ GET  /api/analysis/{task_id} = 查询分析任务状态
 
 - 更新并提交学习笔记和项目规则。
 - 后续继续学习 reports 表和 mock 分析报告。
+
+## 2026-06-22：mock 报告闭环
+
+### 今天完成了什么
+
+- 新增 `backend/app/api/reports.py`。
+- 新增 `reports` 表，用来保存 mock 分析报告。
+- `POST /api/analysis` 创建任务时会同时生成 mock 报告。
+- `GET /api/analysis/{task_id}` 返回 `report_id`。
+- 实现 `GET /api/reports` 查询历史报告列表。
+- 实现 `GET /api/reports/{report_id}` 查询报告详情。
+- 完成 Git 提交：`7e2c16f feat: add mock reports endpoints`。
+
+### 核心概念
+
+```text
+analysis_tasks = 任务状态
+reports = 报告正文
+report_id = 连接任务和报告的编号
+```
+
+### 当前后端状态
+
+第一版 mock 后端主流程已经基本完成：
+
+```text
+自选股 -> 分析任务 -> mock 报告 -> 报告详情 -> 历史报告
+```
+
+### 下一步建议
+
+- 更新项目规则和学习计划。
+- push 当前后端成果。
+- 下一阶段开始 React Native 手机 APP 页面。
