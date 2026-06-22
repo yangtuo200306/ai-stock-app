@@ -74,9 +74,13 @@ d:/ai-stock-analysis/stock-analysis-reference
 - FastAPI 最小后端；
 - `GET /api/health` 健康检查接口；
 - 自选股内存版小闭环；
+- 自选股 SQLite 持久化保存；
 - `GET /api/stocks` 查看自选股列表；
 - `POST /api/stocks` 添加自选股；
 - `DELETE /api/stocks/{code}` 删除自选股；
+- mock 分析任务小闭环；
+- `POST /api/analysis` 创建分析任务；
+- `GET /api/analysis/{task_id}` 查询分析任务状态；
 - 本地验证成功；
 - Git 提交并推送成功；
 - 后端学习笔记文件已更新。

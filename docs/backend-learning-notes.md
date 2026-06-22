@@ -669,3 +669,42 @@ ai_stock.db 数据库文件
 
 - 推送本次代码和学习笔记到 GitHub。
 - 后续可以继续学习 `POST /api/analysis`，开始实现分析任务 mock 闭环。
+
+## 2026-06-22：分析任务 mock 小闭环
+
+### 今天完成了什么
+
+- 新增 `backend/app/api/analysis.py`。
+- 新增 `analysis_tasks` 表，用来保存分析任务状态。
+- 实现 `POST /api/analysis`，创建 mock 分析任务并返回 `task_id`。
+- 实现 `GET /api/analysis/{task_id}`，根据 `task_id` 查询任务状态。
+- 本地验证创建任务、查询任务、查询不存在任务都正常。
+- 完成 Git 提交：`815337f feat: add mock analysis task endpoints`。
+
+### 核心概念
+
+```text
+task_id = 一次分析任务的唯一编号
+stock_code = 要分析哪只股票
+mock = 先用模拟结果跑通流程
+```
+
+当前 mock 任务创建后直接返回：
+
+```text
+status = completed
+progress = 100
+message = mock analysis completed
+```
+
+### 接口对应关系
+
+```text
+POST /api/analysis = 创建分析任务
+GET  /api/analysis/{task_id} = 查询分析任务状态
+```
+
+### 下一步建议
+
+- 更新并提交学习笔记和项目规则。
+- 后续继续学习 reports 表和 mock 分析报告。
