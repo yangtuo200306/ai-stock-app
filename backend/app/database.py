@@ -10,6 +10,16 @@ def get_connection():
     return connection
 
 
+def ensure_column(connection, table_name, column_name, column_definition):
+    columns = connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+    column_names = [column["name"] for column in columns]
+
+    if column_name not in column_names:
+        connection.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
+        )
+
+
 def init_db():
     with get_connection() as connection:
         connection.execute(
@@ -31,8 +41,27 @@ def init_db():
                 status TEXT NOT NULL,
                 progress INTEGER NOT NULL,
                 message TEXT NOT NULL,
+                report_id INTEGER,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        ensure_column(connection, "analysis_tasks", "report_id", "INTEGER")
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                stock_code TEXT NOT NULL,
+                stock_name TEXT NOT NULL,
+                price REAL NOT NULL,
+                score INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                trend TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                risks_json TEXT NOT NULL,
+                indicators_json TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
