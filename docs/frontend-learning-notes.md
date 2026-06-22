@@ -425,3 +425,143 @@ APP 已经有了真实手机 APP 的基础导航结构
 3. 点击自选股创建分析任务；
 4. 查询任务状态；
 5. 进入报告详情。
+
+## 2026-06-22：移动端第二阶段，自选模块完善
+
+### 本阶段完成内容
+
+第二阶段围绕“自选模块”完成了从列表到分析报告的最小前端链路。
+
+已完成：
+
+1. `HomeScreen` 重命名为 `WatchlistScreen`。
+2. 底部 Tab 调整为：
+
+```text
+自选 | 问股 | 大盘 | 设置
+```
+
+3. 自选模块内部新增 Stack 导航：
+
+```text
+WatchlistScreen
+  ↓
+TaskStatusScreen
+  ↓
+ReportDetailScreen
+```
+
+4. 自选页支持：
+   - 读取自选股列表；
+   - 添加自选股；
+   - 删除自选股；
+   - 点击股票创建分析任务；
+   - 显示股票最近一次任务状态。
+5. 新增问股、大盘占位页，为长期导航结构预留位置。
+6. 新增统一类型定义文件 `src/types/index.ts`。
+
+### 本阶段主流程
+
+```text
+进入自选页
+  ↓
+GET /api/stocks 读取自选股
+  ↓
+添加或删除自选股
+  ↓
+点击股票
+  ↓
+POST /api/analysis 创建分析任务
+  ↓
+进入 TaskStatusScreen
+  ↓
+GET /api/analysis/{task_id} 查询任务状态
+  ↓
+点击查看报告
+  ↓
+GET /api/reports/{report_id} 查看报告详情
+```
+
+### 新学到的前端概念
+
+#### Tab 导航
+
+Tab 导航是 APP 底部一级模块切换。
+
+当前结构：
+
+```text
+自选 | 问股 | 大盘 | 设置
+```
+
+#### Stack 导航
+
+Stack 导航用于模块内部页面前进和返回。
+
+本阶段自选模块内部使用：
+
+```text
+Watchlist -> TaskStatus -> ReportDetail
+```
+
+可以理解为：
+
+```text
+Tab = APP 的几个大房间
+Stack = 某个房间里面继续往里走的小房间
+```
+
+#### 类型化导航参数
+
+`WatchlistStackParamList` 规定页面跳转时必须传什么参数。
+
+例如：
+
+```text
+TaskStatus 必须传 taskId 和 stockCode
+ReportDetail 必须传 reportId
+```
+
+这样可以减少页面跳转时漏传参数导致的错误。
+
+#### AsyncStorage 的新增用途
+
+第一阶段 AsyncStorage 用来保存：
+
+```text
+backendUrl
+```
+
+第二阶段新增保存：
+
+```text
+stockTaskIds
+```
+
+作用是记录每只股票最近一次分析任务 ID，方便回到自选页后继续显示任务状态。
+
+### 本阶段验收结果
+
+已手动验证通过：
+
+```text
+添加自选股通过
+删除自选股通过
+点击股票创建分析任务通过
+任务状态页通过
+报告详情页通过
+Tab + Stack 导航结构通过
+```
+
+### 当前限制
+
+报告内容仍然来自后端 mock 数据。
+
+也就是说：
+
+```text
+自选股增删查是真实接口和 SQLite
+分析任务记录是真实写入 SQLite
+报告记录是真实写入 SQLite
+但报告内容本身仍是模拟生成
+```
