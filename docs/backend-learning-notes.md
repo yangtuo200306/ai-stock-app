@@ -440,3 +440,232 @@ f972ca4 docs: update learning notes and collaboration rules
 - GET 如何从数据库读取；
 - DELETE 如何从数据库删除；
 - 为什么数据库能在服务重启后保留数据。
+
+## 2026-06-22：自选股 SQLite 持久化
+
+### 今天完成了什么
+
+- 新增 `backend/app/database.py`，集中管理 SQLite 数据库连接和初始化。
+- 创建 SQLite 数据库文件 `backend/ai_stock.db`。
+- 创建 `stocks` 表保存自选股。
+- 修改 `backend/app/main.py`，服务启动时调用 `init_db()`。
+- 修改 `backend/app/api/stocks.py`，把自选股从内存列表改为 SQLite 保存。
+- 本地验证：添加股票、查询股票、重启服务后再次查询，数据仍然存在。
+- 完成 Git 提交：`d0ad032 feat: persist stocks with SQLite`。
+
+### 核心概念
+
+#### 内存和数据库
+
+```text
+内存 = 程序运行时临时保存，服务停止后数据消失
+数据库 = 数据保存到文件或数据库服务中，服务重启后数据仍然存在
+```
+
+本项目当前从：
+
+```text
+stocks = []
+```
+
+升级为：
+
+```text
+backend/ai_stock.db 里的 stocks 表
+```
+
+#### SQLite
+
+SQLite 是轻量级数据库。
+
+本项目可以先理解为：
+
+```text
+SQLite = 一个可以用 SQL 操作的 .db 数据库文件
+```
+
+#### 数据库、表、字段
+
+```text
+ai_stock.db = 数据库文件
+stocks 表 = 保存自选股的表
+字段 = 表里的列
+一行数据 = 一只自选股
+```
+
+当前 `stocks` 表字段：
+
+| 字段 | 说明 |
+|---|---|
+| id | 主键，自动递增 |
+| code | 股票代码，不能为空，不能重复 |
+| name | 股票名称，不能为空 |
+| created_at | 添加时间，默认当前时间 |
+
+### database.py
+
+`backend/app/database.py` 负责数据库相关逻辑。
+
+#### DATABASE_PATH
+
+```text
+DATABASE_PATH = 数据库文件位置
+```
+
+当前指向：
+
+```text
+backend/ai_stock.db
+```
+
+#### get_connection()
+
+作用：
+
+```text
+打开 SQLite 数据库连接，返回 connection，供查询、添加、删除使用。
+```
+
+#### init_db()
+
+作用：
+
+```text
+初始化数据库结构，确保 stocks 表存在。
+```
+
+重点：
+
+```text
+CREATE TABLE IF NOT EXISTS
+```
+
+意思是：
+
+```text
+如果表不存在，就创建；如果表已经存在，就不重复创建，也不会清空已有数据。
+```
+
+### main.py 中的 init_db()
+
+`backend/app/main.py` 中调用：
+
+```text
+init_db()
+```
+
+作用：
+
+```text
+FastAPI 服务启动时，先确保数据库文件和 stocks 表存在。
+```
+
+注意：
+
+```text
+数据库可以没有数据，但必须先有表结构。
+```
+
+否则查询时可能出现：
+
+```text
+no such table: stocks
+```
+
+### stocks.py 中的数据库操作
+
+#### GET /api/stocks
+
+对应 SQL：
+
+```sql
+SELECT code, name FROM stocks ORDER BY id
+```
+
+作用：
+
+```text
+从 stocks 表中查询 code 和 name，并按 id 顺序返回。
+```
+
+代码中的：
+
+```text
+rows = 数据库查询结果
+items = 整理后准备返回给前端的 JSON 数据结构
+```
+
+#### POST /api/stocks
+
+对应 SQL：
+
+```sql
+INSERT OR IGNORE INTO stocks (code, name) VALUES (?, ?)
+```
+
+作用：
+
+```text
+向 stocks 表插入一只股票。
+```
+
+其中：
+
+```text
+INSERT = 插入
+OR IGNORE = 如果 code 重复，就忽略，不报错
+? = 占位符，用来安全接收外部输入，避免 SQL 注入
+```
+
+#### DELETE /api/stocks/{code}
+
+对应 SQL：
+
+```sql
+DELETE FROM stocks WHERE code = ?
+```
+
+作用：
+
+```text
+从 stocks 表中删除 code 等于指定值的那一行数据。
+```
+
+代码中的：
+
+```text
+cursor.rowcount > 0
+```
+
+表示：
+
+```text
+刚才的 DELETE 是否真的删除了数据。
+```
+
+### 本次学习总结
+
+```text
+GET     -> SELECT 查询
+POST    -> INSERT 插入
+DELETE  -> DELETE 删除
+```
+
+自选股数据流变成：
+
+```text
+接口请求
+↓
+FastAPI 路由函数
+↓
+SQLite SQL 操作
+↓
+ai_stock.db 数据库文件
+↓
+接口返回 JSON
+```
+
+### 下一步建议
+
+- 推送本次代码和学习笔记到 GitHub。
+- 后续可以继续学习 `POST /api/analysis`，开始实现分析任务 mock 闭环。
