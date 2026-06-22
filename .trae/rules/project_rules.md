@@ -72,10 +72,14 @@ d:/ai-stock-analysis/stock-analysis-reference
 已完成：
 
 - FastAPI 最小后端；
-- `GET /api/health`；
+- `GET /api/health` 健康检查接口；
+- 自选股内存版小闭环；
+- `GET /api/stocks` 查看自选股列表；
+- `POST /api/stocks` 添加自选股；
+- `DELETE /api/stocks/{code}` 删除自选股；
 - 本地验证成功；
 - Git 提交并推送成功；
-- 后端学习笔记文件已创建。
+- 后端学习笔记文件已更新。
 
 当前后端结构：
 
@@ -88,27 +92,38 @@ backend/
     api/
       __init__.py
       health.py
+      stocks.py
 ```
 
 当前接口：
 
 ```text
-GET /api/health
+GET     /api/health
+GET     /api/stocks
+POST    /api/stocks
+DELETE  /api/stocks/{code}
 ```
 
-返回：
+当前自选股数据保存方式：
 
-```json
-{
-  "status": "ok",
-  "message": "AI Stock App backend is running"
-}
+```text
+内存列表 stocks = []
+```
+
+注意：
+
+```text
+服务重启后，自选股数据会清空。
+下一阶段建议学习 SQLite 数据库，实现持久化保存。
 ```
 
 已推送提交：
 
 ```text
 3676dca feat: add FastAPI health endpoint
+0d9a665 feat: add stocks list endpoint
+bfb92d0 feat: add in-memory stock management
+f972ca4 docs: update learning notes and collaboration rules
 ```
 
 ## 7. Git 协作约定

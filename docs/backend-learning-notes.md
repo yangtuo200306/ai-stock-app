@@ -191,23 +191,53 @@ Pushed = 本地提交已经同步到 GitHub
 - `8000` 是后端服务监听的端口。
 - `feat: add FastAPI health endpoint` 不是单独运行的命令，而是 `git commit -m` 后面的提交信息。
 
-## 2026-06-22：GET /api/stocks 自选股列表接口
+## 2026-06-22：自选股内存版小闭环
 
 ### 今天完成了什么
 
-- 新增了自选股接口文件 `backend/app/api/stocks.py`。
+- 新增并完善了自选股接口文件 `backend/app/api/stocks.py`。
 - 在 `backend/app/main.py` 中注册了 `stocks_router`。
-- 实现了 `GET /api/stocks`。
-- 本地验证 `GET /api/health` 和 `GET /api/stocks` 都能正常返回。
+- 实现了 `GET /api/stocks`，用于查看自选股列表。
+- 实现了 `POST /api/stocks`，用于添加自选股。
+- 实现了 `DELETE /api/stocks/{code}`，用于删除指定股票。
+- 使用内存列表 `stocks = []` 临时保存自选股。
+- 本地验证添加、查看、删除流程都能正常运行。
 - 完成 Git 提交并推送到 GitHub。
 
-### 当前新增接口
+### 当前接口
 
 ```text
-GET /api/stocks
+GET     /api/stocks
+POST    /api/stocks
+DELETE  /api/stocks/{code}
 ```
 
-当前返回：
+### 当前数据保存方式
+
+```text
+stocks = []
+```
+
+它是一个 Python 列表，用于临时保存自选股。
+
+特点：
+
+```text
+服务运行时存在
+服务停止后消失
+适合学习和临时测试
+后面需要 SQLite 才能长期保存
+```
+
+### GET /api/stocks
+
+作用：
+
+```text
+查看当前自选股列表。
+```
+
+初始返回：
 
 ```json
 {
@@ -215,62 +245,150 @@ GET /api/stocks
 }
 ```
 
-### 核心概念
-
-#### 自选股接口
-
-`GET /api/stocks` 是给手机 APP 自选股页面使用的。
-
-页面以后可以通过这个接口向后端询问：
-
-```text
-当前有哪些自选股？
-```
-
-#### 空列表
-
-当前返回：
+添加股票后返回示例：
 
 ```json
 {
-  "items": []
+  "items": [
+    {
+      "code": "600519",
+      "name": "贵州茅台"
+    }
+  ]
 }
 ```
 
-表示：
+### POST /api/stocks
+
+作用：
 
 ```text
-请求成功，但现在还没有自选股数据。
+添加一只自选股。
 ```
 
-空列表不是错误。
+请求体 body：
 
-#### mock / 占位接口
-
-现在还没有数据库，也没有真实股票数据，所以先返回空列表。
-
-这属于 mock / 占位接口：
-
-```text
-先把接口通道建好，后面再接真实数据。
+```json
+{
+  "code": "600519",
+  "name": "贵州茅台"
+}
 ```
 
-#### 多 router 注册
+返回：
 
-`stocks.py` 中定义自选股相关接口。
+```json
+{
+  "message": "stock added",
+  "item": {
+    "code": "600519",
+    "name": "贵州茅台"
+  }
+}
+```
 
-`main.py` 中通过下面方式注册：
+学到：
 
 ```text
-app.include_router(stocks_router)
+body = 客户端发给后端的数据
+return = 后端返回给客户端的数据
+```
+
+### StockCreate 请求模型
+
+```text
+StockCreate 用来规定 POST 请求体的数据结构。
+```
+
+当前字段：
+
+```text
+code: str
+name: str
 ```
 
 可以理解为：
 
 ```text
-stocks.py 定义接口
-main.py 把接口挂到 FastAPI 主应用上
+添加股票时，前端必须提交 code 和 name。
 ```
+
+### DELETE /api/stocks/{code}
+
+作用：
+
+```text
+根据股票代码删除自选股。
+```
+
+示例：
+
+```text
+DELETE /api/stocks/600519
+```
+
+其中 `{code}` 是路径参数。
+
+删除成功返回：
+
+```json
+{
+  "message": "stock deleted",
+  "code": "600519"
+}
+```
+
+股票不存在返回：
+
+```json
+{
+  "message": "stock not found",
+  "code": "000001"
+}
+```
+
+### 核心概念
+
+#### CRUD 雏形
+
+当前自选股模块已经具备：
+
+```text
+Create  POST /api/stocks
+Read    GET /api/stocks
+Delete  DELETE /api/stocks/{code}
+```
+
+暂时还没有做：
+
+```text
+Update
+```
+
+#### 路径参数
+
+```text
+/api/stocks/{code}
+```
+
+`{code}` 表示从 URL 中接收一个可变参数。
+
+例如：
+
+```text
+/api/stocks/600519 -> code = "600519"
+```
+
+#### 内存数据和数据库
+
+当前 `stocks` 列表是内存数据。
+
+```text
+内存 = 服务运行时临时保存
+数据库 = 服务重启后仍然保存
+```
+
+所以下一阶段适合学习 SQLite。
 
 ### 本次遇到的问题
 
@@ -283,11 +401,8 @@ main.py 把接口挂到 FastAPI 主应用上
 表现是：
 
 ```text
-旧的 /api/health 可以访问
-新的 /api/stocks 返回 404
+旧接口能访问，新接口可能 404
 ```
-
-原因是浏览器访问到的还是旧服务，不是刚修改后的新版服务。
 
 解决方式：
 
@@ -297,31 +412,31 @@ main.py 把接口挂到 FastAPI 主应用上
 
 ### Git 学习记录
 
-本次提交：
+本阶段相关提交：
 
 ```text
 0d9a665 feat: add stocks list endpoint
+bfb92d0 feat: add in-memory stock management
+f972ca4 docs: update learning notes and collaboration rules
 ```
 
 学到：
 
 ```text
-新增接口时，定义接口文件和注册入口文件通常要一起提交。
-```
-
-本次涉及文件：
-
-```text
-backend/app/api/stocks.py
-backend/app/main.py
+功能代码和文档/规则可以分开提交，让 Git 历史更清楚。
 ```
 
 ### 下一步建议
 
-下一步可以继续做自选股相关功能：
+下一步建议学习 SQLite 数据库，把自选股从内存保存升级为持久化保存。
 
-```text
-POST /api/stocks
-```
+可以学习：
 
-第一版可以先学习如何接收前端传来的股票代码和名称，暂时仍不接数据库。
+- SQLite 是什么；
+- 数据库文件是什么；
+- 表和字段是什么；
+- 如何创建 stocks 表；
+- POST 如何保存到数据库；
+- GET 如何从数据库读取；
+- DELETE 如何从数据库删除；
+- 为什么数据库能在服务重启后保留数据。
