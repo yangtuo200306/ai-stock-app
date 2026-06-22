@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api", tags=["stocks"])
+from app.database import get_connection
 
-stocks = []
+router = APIRouter(prefix="/api", tags=["stocks"])
 
 
 class StockCreate(BaseModel):
@@ -13,7 +13,20 @@ class StockCreate(BaseModel):
 
 @router.get("/stocks")
 def get_stocks():
-    return {"items": stocks}
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT code, name FROM stocks ORDER BY id"
+        ).fetchall()
+
+    items = [
+        {
+            "code": row["code"],
+            "name": row["name"],
+        }
+        for row in rows
+    ]
+
+    return {"items": items}
 
 
 @router.post("/stocks")
@@ -22,7 +35,12 @@ def add_stock(stock: StockCreate):
         "code": stock.code,
         "name": stock.name,
     }
-    stocks.append(item)
+
+    with get_connection() as connection:
+        connection.execute(
+            "INSERT OR IGNORE INTO stocks (code, name) VALUES (?, ?)",
+            (stock.code, stock.name),
+        )
 
     return {
         "message": "stock added",
@@ -32,13 +50,17 @@ def add_stock(stock: StockCreate):
 
 @router.delete("/stocks/{code}")
 def delete_stock(code: str):
-    for item in stocks:
-        if item["code"] == code:
-            stocks.remove(item)
-            return {
-                "message": "stock deleted",
-                "code": code,
-            }
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "DELETE FROM stocks WHERE code = ?",
+            (code,),
+        )
+
+    if cursor.rowcount > 0:
+        return {
+            "message": "stock deleted",
+            "code": code,
+        }
 
     return {
         "message": "stock not found",
