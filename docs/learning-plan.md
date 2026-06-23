@@ -432,10 +432,17 @@ Tab + Stack 导航结构通过
 ai-stock-app/backend
 ai-stock-app/mobile-app
 ai-stock-app/docs
+ai-stock-app/docs/releases/v0.1-summary.md
 ```
+
+当前状态：
+
+1. v0.1 AI Stock App MVP 已完成并通过手动验收。
+2. v0.1 总结文档已生成：`docs/releases/v0.1-summary.md`。
+3. 本地阶段成果已推送到远程仓库。
 
 建议下一步：
 
-1. 提交本阶段改动：历史报告列表 + 新导航结构。
-2. 下一阶段优先方向：备用数据源 fallback，或开始规划登录 / 注册 / 个人账号体系。
+1. 进入 v0.2 详细规划。
+2. v0.2 候选方向：技术指标、动态评分建议、报告体验增强、备用数据源 fallback、问股最小版、我的模块基础整理。
 3. 继续保持小步闭环：先计划、再执行、学习、记录问题、审查。
