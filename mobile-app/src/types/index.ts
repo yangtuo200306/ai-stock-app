@@ -55,6 +55,19 @@ export interface ReportHistoryItem {
   created_at: string;
 }
 
+export interface AskResponse {
+  stock_code: string;
+  stock_name: string;
+  price: number;
+  change_pct: number;
+  trend: string;
+  action: string;
+  score: number;
+  answer: string;
+  risks: string[];
+  indicators: ReportIndicators;
+}
+
 export type RootTabParamList = {
   自选: undefined;
   问股: undefined;

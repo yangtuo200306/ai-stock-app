@@ -4,7 +4,7 @@ import type { RootTabParamList } from '../types';
 import WatchlistStackNavigator from './WatchlistStackNavigator';
 import ReportStackNavigator from './ReportStackNavigator';
 import AskScreen from '../screens/AskScreen';
-import SettingsScreen from '../screens/SettingsScreen';
+import MineScreen from '../screens/MineScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
@@ -23,7 +23,7 @@ export default function AppNavigator() {
           component={ReportStackNavigator}
           options={{ headerShown: false }}
         />
-        <Tab.Screen name="我的" component={SettingsScreen} />
+        <Tab.Screen name="我的" component={MineScreen} />
       </Tab.Navigator>
     </NavigationContainer>
   );

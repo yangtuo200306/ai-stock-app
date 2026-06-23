@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.analysis import router as analysis_router
+from app.api.ask import router as ask_router
 from app.api.health import router as health_router
 from app.api.market import router as market_router
 from app.api.reports import router as reports_router
@@ -26,5 +27,6 @@ init_db()
 app.include_router(health_router)
 app.include_router(stocks_router)
 app.include_router(analysis_router)
+app.include_router(ask_router)
 app.include_router(market_router)
 app.include_router(reports_router)

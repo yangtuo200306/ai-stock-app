@@ -250,3 +250,120 @@
 - 影响：对用户阅读友好，但前端如果要按错误类型展示不同 UI，只能依赖文本内容，不够稳定。
 - 当前是否需要立即修：否，当前阶段先保证错误提示清楚。
 - 后续建议：后续可考虑在失败响应中增加 `error_code`，例如 `MARKET_SOURCE_NETWORK_ERROR`、`INVALID_STOCK_CODE`。
+
+## 问题 28：ask.py 的 answer 与 report summary 有部分重复
+
+- 位置：`backend/app/api/ask.py`
+- 类型：文案与结构设计隐患
+- 现象：`answer` 会先拼接股票名称、当前价、涨跌幅、趋势和建议，随后又拼接 `report["summary"]`，而 summary 本身也包含这些信息。
+- 影响：当前不影响功能，但问股回答可能略显重复。
+- 当前是否需要立即修：否，v0.2 阶段 4 先保证最小闭环。
+- 后续建议：后续可为问股单独抽一个更简洁的 answer builder。
+
+## 问题 29：“问股最小版”容易被误解为已接入大模型
+
+- 位置：`mobile-app/src/screens/AskScreen.tsx`、`backend/app/api/ask.py`
+- 类型：产品表达隐患
+- 现象：当前问股最小版使用真实行情、历史行情、MA 指标和规则回答，但尚未调用大模型 API。
+- 影响：用户可能误以为当前已经是完整 AI 聊天能力。
+- 当前是否需要立即修：否，当前页面已使用“基础分析”表述。
+- 后续建议：接入大模型前继续保持“基础分析”表述；接入后再区分规则分析和 AI 回答。
+
+## 问题 30：AskScreen.tsx 错误解析依赖 FastAPI 默认 detail 字段
+
+- 位置：`mobile-app/src/screens/AskScreen.tsx`
+- 类型：接口格式隐患
+- 现象：前端请求失败时读取 `data.detail` 作为错误提示。
+- 影响：当前与 FastAPI `HTTPException` 默认格式匹配；如果后续统一为 `{ error: ... }` 或结构化错误格式，前端需要同步调整。
+- 当前是否需要立即修：否。
+- 后续建议：后续设计统一 API 错误响应结构。
+
+## 问题 31：执行阶段曾遗漏确认 ask_router 是否实际注册
+
+- 位置：`backend/app/main.py`
+- 类型：流程与验证问题
+- 现象：首次执行总结时声称已注册 `ask_router`，但用户复查发现 `main.py` 中缺少 `app.include_router(ask_router)`。
+- 影响：如果未发现，`POST /api/ask` 会返回 404。
+- 当前是否需要立即修：已修复。
+- 后续建议：涉及入口文件、路由注册和配置文件的关键改动后，必须重新读取文件确认最终落盘状态。
+
+## 问题 32：当前 AskResponse 为最小版扁平结构
+
+- 位置：`backend/app/api/ask.py`、`mobile-app/src/types/index.ts`
+- 类型：接口演进限制
+- 现象：当前 `AskResponse` 直接平铺股票信息、行情、分析结果、回答、风险和指标。
+- 影响：当前字段少时简单可用；未来接入大模型、多轮问答、模型信息、追问建议时表达能力不足。
+- 当前是否需要立即修：否，v0.2 阶段 4 保持最小结构。
+- 后续建议：大模型阶段可拆分为 `stock`、`market`、`technicals`、`analysis`、`ai` 等分组结构。
+
+## 问题 33：前后端 AskResponse 类型需要人工保持一致
+
+- 位置：`backend/app/api/ask.py`、`mobile-app/src/types/index.ts`
+- 类型：类型同步隐患
+- 现象：后端和前端分别手写 `AskResponse`。
+- 影响：当前字段较少风险可控；后续字段变化时可能出现后端已改、前端漏改。
+- 当前是否需要立即修：否。
+- 后续建议：后续可考虑 OpenAPI 生成前端类型，或建立接口字段变更检查习惯。
+
+## 问题 34：ask.py 中 AskResponse.indicators 使用 dict
+
+- 位置：`backend/app/api/ask.py`
+- 类型：类型约束隐患
+- 现象：后端响应模型中 `indicators` 使用 `dict`，没有明确字段结构。
+- 影响：当前可用；但 OpenAPI 文档不够精确，后续字段维护不够清晰。
+- 当前是否需要立即修：否。
+- 后续建议：后续可补充更明确的 IndicatorsResponse 模型。
+
+## 问题 35：ask.py 将所有 MarketDataError 统一返回 400
+
+- 位置：`backend/app/api/ask.py`
+- 类型：错误响应设计隐患
+- 现象：无论是输入错误、股票不存在、行情源网络失败还是历史行情不足，都统一返回 400。
+- 影响：当前前端能展示错误文字；但无法通过状态码或 error_code 区分错误类型。
+- 当前是否需要立即修：否。
+- 后续建议：后续可按错误类型返回 400 / 404 / 503，或增加结构化 `error_code`。
+
+## 问题 36：AskScreen.tsx 涨跌幅颜色逻辑可读性一般
+
+- 位置：`mobile-app/src/screens/AskScreen.tsx`
+- 类型：可读性隐患
+- 现象：涨跌幅颜色通过嵌套三元表达式计算。
+- 影响：当前功能正常；后续如果颜色规则扩展，可读性会下降。
+- 当前是否需要立即修：否。
+- 后续建议：后续可抽成 `getChangeColor` 函数。
+
+## 问题 37：MineScreen.tsx 和 SettingsScreen.tsx 存在后端地址配置逻辑重复
+
+- 位置：`mobile-app/src/screens/MineScreen.tsx`、`mobile-app/src/screens/SettingsScreen.tsx`
+- 类型：代码重复隐患
+- 现象：`MineScreen.tsx` 迁移了 `SettingsScreen.tsx` 中读取、保存后端地址和测试连接的逻辑。
+- 影响：当前可接受；如果后续两个页面都维护，可能出现改一处忘一处。
+- 当前是否需要立即修：否，v0.2 阶段 5 保持最小整理。
+- 后续建议：后续可删除 `SettingsScreen.tsx`，或抽出 `BackendSettingsSection` 组件。
+
+## 问题 38：SettingsScreen.tsx 当前保留但未挂载
+
+- 位置：`mobile-app/src/screens/SettingsScreen.tsx`、`mobile-app/src/navigation/AppNavigator.tsx`
+- 类型：阶段性文件清理问题
+- 现象：“我的”Tab 已改为挂载 `MineScreen`，`SettingsScreen.tsx` 当前不再直接挂载。
+- 影响：当前不影响运行；后续可能成为无用文件。
+- 当前是否需要立即修：否，本阶段按计划保留旧文件。
+- 后续建议：确认 `MineScreen` 稳定后，再删除 `SettingsScreen.tsx` 或改为设置子组件。
+
+## 问题 39：backendUrl 存储 key 在多个页面重复定义
+
+- 位置：`mobile-app/src/screens/MineScreen.tsx`、`mobile-app/src/screens/AskScreen.tsx`、`mobile-app/src/screens/SettingsScreen.tsx`
+- 类型：常量重复隐患
+- 现象：多个页面分别定义 `BACKEND_URL_STORAGE_KEY = 'backendUrl'`。
+- 影响：当前可用；如果后续某处 key 改错，会导致页面间读取不一致。
+- 当前是否需要立即修：否，当前阶段保持最小改动。
+- 后续建议：后续可抽出 `storageKeys.ts` 统一管理。
+
+## 问题 40：MineScreen.tsx 只有登录/注册占位，没有真实账号能力
+
+- 位置：`mobile-app/src/screens/MineScreen.tsx`
+- 类型：阶段性功能限制
+- 现象：当前只显示“登录 / 注册：后续开放”，没有真实登录、注册、token 或用户信息。
+- 影响：符合 v0.2 阶段 5 范围；用户暂时不能真正登录。
+- 当前是否需要立即修：否。
+- 后续建议：账号阶段再实现注册、登录、token、退出登录和用户数据隔离。
