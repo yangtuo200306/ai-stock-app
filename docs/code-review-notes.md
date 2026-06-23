@@ -178,3 +178,75 @@
 - 影响：当前能满足开发调试需要，但还不是真正的个人中心，也没有登录、注册、账号信息等能力。
 - 当前是否需要立即修：否，本阶段只做导航方向调整和历史报告闭环。
 - 后续建议：实现账号体系时再设计 `MineScreen` 或个人中心 Stack，并将当前设置能力迁移进去。
+
+## 问题 20：get_stock_history 的 days 参数已修复
+
+- 位置：`backend/app/services/market_data.py`
+- 类型：代码实现隐患
+- 原现象：`get_stock_history(code, days=30)` 定义了 `days` 参数，但实现未按 `days` 截取最近指定天数。
+- 当前状态：已修复。
+- 修复方式：返回前使用 `history[-days:]` 截取最近 `days` 条有效历史行情。
+- 当前影响：`days` 参数语义已与实现一致，仍保留至少 20 条有效数据校验。
+
+## 问题 21：efinance 历史行情接口也存在间歇性网络失败风险
+
+- 位置：`backend/app/services/market_data.py`
+- 类型：第三方数据源稳定性隐患
+- 现象：本次验收时观察到 `ef.stock.get_quote_history(...)` 也可能出现 `RemoteDisconnected` 等网络异常。
+- 影响：即使实时行情可用，历史行情失败也会导致分析任务失败，无法生成 MA 动态报告。
+- 当前是否需要立即修：否，v0.2 阶段 1 先按计划返回明确失败信息。
+- 后续建议：在 fallback 最小版阶段继续处理，例如增加更清晰错误提示、短期历史行情缓存或备用历史行情数据源。
+
+## 问题 22：历史报告列表接口开始承担摘要提取逻辑
+
+- 位置：`backend/app/api/reports.py`
+- 类型：代码结构隐患
+- 现象：`GET /api/reports` 现在会从 `indicators_json` 中提取 `change_pct`、`ma_trend`，并组装 `trend_summary`。
+- 影响：当前逻辑较简单，可以接受；如果后续列表继续增加 MA、评分原因、风险摘要等字段，`reports.py` 可能变臃肿。
+- 当前是否需要立即修：否，v0.2 阶段 2 保持最小改动。
+- 后续建议：如果历史列表摘要继续扩展，可考虑抽出报告摘要构建函数。
+
+## 问题 23：前端 TypeScript 类型不校验运行时接口数据
+
+- 位置：`mobile-app/src/types/index.ts`
+- 类型：类型边界隐患
+- 现象：`ReportHistoryItem` 定义了 `price`、`change_pct`、`trend_summary` 等字段，但 TypeScript 只在编译期检查代码，不会自动校验后端真实返回值。
+- 影响：如果后端运行时返回字段类型异常，例如 `price` 返回字符串，前端编译不会提前发现。
+- 当前是否需要立即修：否，当前接口简单且已通过手动接口验收。
+- 后续建议：接口复杂后可考虑增加响应数据校验或统一 API client。
+
+## 问题 24：历史报告列表涨跌幅颜色逻辑可读性一般
+
+- 位置：`mobile-app/src/screens/ReportHistoryScreen.tsx`
+- 类型：可读性隐患
+- 现象：涨跌幅颜色通过嵌套三元表达式计算。
+- 影响：功能正确，但对新手阅读和后续维护不够直观。
+- 当前是否需要立即修：否，v0.2 阶段 2 已按计划完成并通过审查。
+- 后续建议：如果该逻辑继续扩展，可抽成 `getChangeColorStyle` 之类的小函数。
+
+## 问题 25：fallback 预留仍是函数级结构
+
+- 位置：`backend/app/services/market_data.py`
+- 类型：架构阶段性限制
+- 现象：当前通过 `_get_stock_quote_from_efinance`、`_get_stock_history_from_efinance` 和 fallback 占位函数预留多数据源入口。
+- 影响：当前只有一个真实数据源时可以接受；如果后续数据源数量增加，继续堆叠函数会让 `market_data.py` 变复杂。
+- 当前是否需要立即修：否，v0.2 阶段 3 只做 fallback 最小版。
+- 后续建议：数据源复杂后升级为 Provider / Manager 架构，例如 `EfinanceProvider`、`AkshareProvider` 和 `MarketDataManager`。
+
+## 问题 26：备用行情数据源尚未确定且未接入调用链
+
+- 位置：`backend/app/services/market_data.py`
+- 类型：阶段性限制
+- 现象：`_get_stock_quote_from_fallback` 和 `_get_stock_history_from_fallback` 已存在，但当前只抛出“备用数据源暂未配置”，主数据源失败后也不会自动调用 fallback。
+- 影响：当前错误提示更清楚，但还不能在 efinance 失败时自动切换到备用源。
+- 当前是否需要立即修：否，本阶段按计划只预留结构，不真正接入第二个数据源。
+- 后续建议：选定备用数据源后，再设计调用顺序、错误合并方式和数据字段适配逻辑。
+
+## 问题 27：行情错误仍缺少结构化 error_code
+
+- 位置：`backend/app/services/market_data.py`、`backend/app/api/analysis.py`
+- 类型：接口设计隐患
+- 现象：当前错误信息已经包含“主行情源 efinance”等上下文，但接口仍主要通过 `error` 文本返回失败原因。
+- 影响：对用户阅读友好，但前端如果要按错误类型展示不同 UI，只能依赖文本内容，不够稳定。
+- 当前是否需要立即修：否，当前阶段先保证错误提示清楚。
+- 后续建议：后续可考虑在失败响应中增加 `error_code`，例如 `MARKET_SOURCE_NETWORK_ERROR`、`INVALID_STOCK_CODE`。

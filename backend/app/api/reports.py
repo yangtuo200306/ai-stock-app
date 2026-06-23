@@ -12,24 +12,31 @@ def get_reports():
     with get_connection() as connection:
         rows = connection.execute(
             """
-            SELECT id, stock_code, stock_name, score, action, trend, created_at
+            SELECT id, stock_code, stock_name, price, score, action, trend,
+                   indicators_json, created_at
             FROM reports
             ORDER BY id DESC
             """
         ).fetchall()
 
-    items = [
-        {
+    items = []
+    for row in rows:
+        indicators = json.loads(row["indicators_json"]) if row["indicators_json"] else {}
+        change_pct = indicators.get("change_pct")
+        ma_trend = indicators.get("ma_trend")
+
+        items.append({
             "id": row["id"],
             "stock_code": row["stock_code"],
             "stock_name": row["stock_name"],
+            "price": row["price"],
             "score": row["score"],
             "action": row["action"],
             "trend": row["trend"],
+            "change_pct": change_pct,
+            "trend_summary": ma_trend or row["trend"],
             "created_at": row["created_at"],
-        }
-        for row in rows
-    ]
+        })
 
     return {"items": items}
 

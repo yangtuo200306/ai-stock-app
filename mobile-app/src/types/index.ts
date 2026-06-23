@@ -14,6 +14,20 @@ export interface AnalysisTask {
   updated_at?: string;
 }
 
+export interface ReportIndicators {
+  change_pct?: number;
+  source?: string;
+  fetched_at?: string;
+  ma5?: number;
+  ma10?: number;
+  ma20?: number;
+  bias_ma5?: number;
+  bias_ma10?: number;
+  bias_ma20?: number;
+  ma_trend?: string;
+  score_reasons?: string[];
+}
+
 export interface Report {
   id: number;
   stock_code: string;
@@ -24,7 +38,7 @@ export interface Report {
   trend: string;
   summary: string;
   risks: string[];
-  indicators: Record<string, unknown>;
+  indicators: ReportIndicators;
   created_at: string;
 }
 
@@ -32,9 +46,12 @@ export interface ReportHistoryItem {
   id: number;
   stock_code: string;
   stock_name: string;
+  price?: number;
   score: number;
   action: string;
   trend: string;
+  change_pct?: number;
+  trend_summary?: string;
   created_at: string;
 }
 

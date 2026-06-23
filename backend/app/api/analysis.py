@@ -5,7 +5,9 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.database import get_connection
-from app.services.market_data import MarketDataError, get_stock_quote
+from app.services.market_data import MarketDataError, get_stock_quote, get_stock_history
+from app.services.technical_indicators import build_technical_indicators
+from app.services.report_builder import build_analysis_report
 
 router = APIRouter(prefix="/api", tags=["analysis"])
 
@@ -19,7 +21,7 @@ def create_analysis_task(analysis: AnalysisCreate):
     task_id = str(uuid4())
     status = "completed"
     progress = 100
-    message = "analysis completed with real-time quote"
+    message = "analysis completed with real-time quote and technical indicators"
 
     try:
         quote = get_stock_quote(analysis.stock_code)
@@ -46,18 +48,33 @@ def create_analysis_task(analysis: AnalysisCreate):
             "error": failed_message,
         }
 
-    stock_name = quote.name
-    price = quote.price
-    score = 80
-    action = "观望"
-    trend = "震荡" if abs(quote.change_pct) <= 1 else ("偏强" if quote.change_pct > 1 else "偏弱")
-    summary = f"基于实时行情分析：{quote.name}（{quote.code}）当前价 {quote.price}，涨跌幅 {quote.change_pct}%。"
-    risks = ["行情数据来自第三方接口（efinance），仅供学习和参考"]
-    indicators = {
-        "change_pct": quote.change_pct,
-        "source": quote.source,
-        "fetched_at": quote.fetched_at,
-    }
+    try:
+        history = get_stock_history(analysis.stock_code)
+    except MarketDataError as error:
+        failed_message = str(error)
+        with get_connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO analysis_tasks (
+                    task_id, stock_code, status, progress, message, report_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (task_id, analysis.stock_code, "failed", 0, failed_message, None),
+            )
+
+        return {
+            "message": "analysis task failed",
+            "task_id": task_id,
+            "stock_code": analysis.stock_code,
+            "status": "failed",
+            "progress": 0,
+            "report_id": None,
+            "error": failed_message,
+        }
+
+    technicals = build_technical_indicators(quote.price, history)
+    report = build_analysis_report(quote, technicals)
 
     with get_connection() as connection:
         cursor = connection.execute(
@@ -69,15 +86,15 @@ def create_analysis_task(analysis: AnalysisCreate):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                quote.code,
-                stock_name,
-                price,
-                score,
-                action,
-                trend,
-                summary,
-                json.dumps(risks, ensure_ascii=False),
-                json.dumps(indicators, ensure_ascii=False),
+                report["stock_code"],
+                report["stock_name"],
+                report["price"],
+                report["score"],
+                report["action"],
+                report["trend"],
+                report["summary"],
+                json.dumps(report["risks"], ensure_ascii=False),
+                json.dumps(report["indicators"], ensure_ascii=False),
             ),
         )
         report_id = cursor.lastrowid

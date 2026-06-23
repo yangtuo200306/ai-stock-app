@@ -116,6 +116,61 @@ export default function ReportDetailScreen() {
           </View>
         )}
 
+        {report.indicators?.ma5 != null && (
+          <>
+            <Text style={styles.sectionTitle}>技术指标</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>MA5</Text>
+              <Text style={styles.value}>{report.indicators.ma5}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>MA10</Text>
+              <Text style={styles.value}>{report.indicators.ma10}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>MA20</Text>
+              <Text style={styles.value}>{report.indicators.ma20}</Text>
+            </View>
+          </>
+        )}
+
+        {report.indicators?.bias_ma5 != null && (
+          <>
+            <Text style={styles.sectionTitle}>乖离率</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>相对 MA5</Text>
+              <Text style={styles.value}>{report.indicators.bias_ma5}%</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>相对 MA10</Text>
+              <Text style={styles.value}>{report.indicators.bias_ma10}%</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>相对 MA20</Text>
+              <Text style={styles.value}>{report.indicators.bias_ma20}%</Text>
+            </View>
+          </>
+        )}
+
+        {report.indicators?.ma_trend != null && (
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>均线趋势</Text>
+            <Text style={styles.value}>{report.indicators.ma_trend}</Text>
+          </View>
+        )}
+
+        {report.indicators?.score_reasons != null &&
+          report.indicators.score_reasons.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>评分原因</Text>
+              {report.indicators.score_reasons.map((reason, index) => (
+                <Text key={index} style={styles.reasonItem}>
+                  - {reason}
+                </Text>
+              ))}
+            </>
+          )}
+
         <Text style={styles.sectionTitle}>摘要</Text>
         <Text style={styles.summaryText}>{report.summary}</Text>
 
@@ -194,6 +249,12 @@ const styles = StyleSheet.create({
   riskItem: {
     fontSize: 15,
     color: '#dc2626',
+    marginBottom: 8,
+    lineHeight: 22,
+  },
+  reasonItem: {
+    fontSize: 15,
+    color: '#2563eb',
     marginBottom: 8,
     lineHeight: 22,
   },

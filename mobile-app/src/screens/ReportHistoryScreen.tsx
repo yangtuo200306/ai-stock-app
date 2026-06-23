@@ -88,32 +88,54 @@ export default function ReportHistoryScreen() {
       contentContainerStyle={styles.listContent}
       data={items}
       keyExtractor={(item) => String(item.id)}
-      renderItem={({ item }) => (
-        <Pressable
-          style={styles.card}
-          onPress={() => navigation.navigate('ReportDetail', { reportId: item.id })}
-        >
-          <Text style={styles.stockName}>
-            {item.stock_name || item.stock_code}
-          </Text>
-          {item.stock_name && (
-            <Text style={styles.stockCode}>{item.stock_code}</Text>
-          )}
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>评分</Text>
-            <Text style={styles.metaValue}>{item.score ?? '--'}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>建议</Text>
-            <Text style={styles.metaValue}>{item.action || '--'}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>趋势</Text>
-            <Text style={styles.metaValue}>{item.trend || '--'}</Text>
-          </View>
-          <Text style={styles.dateText}>{item.created_at || '--'}</Text>
-        </Pressable>
-      )}
+      renderItem={({ item }) => {
+        const changeColor =
+          item.change_pct != null
+            ? item.change_pct > 0
+              ? styles.changeUp
+              : item.change_pct < 0
+                ? styles.changeDown
+                : styles.changeFlat
+            : styles.changeFlat;
+
+        return (
+          <Pressable
+            style={styles.card}
+            onPress={() => navigation.navigate('ReportDetail', { reportId: item.id })}
+          >
+            <Text style={styles.stockName}>
+              {item.stock_name || item.stock_code}
+            </Text>
+            {item.stock_name && (
+              <Text style={styles.stockCode}>{item.stock_code}</Text>
+            )}
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>当前价格</Text>
+              <Text style={styles.priceValue}>
+                {item.price != null ? item.price : '--'}
+              </Text>
+              <Text style={[styles.changeValue, changeColor]}>
+                {item.change_pct != null
+                  ? `${item.change_pct > 0 ? '+' : ''}${item.change_pct}%`
+                  : '--'}
+              </Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>评分</Text>
+              <Text style={styles.metaValue}>{item.score ?? '--'}</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>建议</Text>
+              <Text style={styles.metaValue}>{item.action || '--'}</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>趋势</Text>
+              <Text style={styles.trendSummaryValue}>{item.trend_summary || item.trend || '--'}</Text>
+            </View>
+            <Text style={styles.dateText}>{item.created_at || '--'}</Text>
+          </Pressable>
+        );
+      }}
     />
   );
 }
@@ -150,6 +172,38 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginBottom: 12,
   },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  priceLabel: {
+    fontSize: 15,
+    color: '#64748b',
+    marginRight: 8,
+  },
+  priceValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  changeValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 12,
+  },
+  changeUp: {
+    color: '#dc2626',
+  },
+  changeDown: {
+    color: '#16a34a',
+  },
+  changeFlat: {
+    color: '#64748b',
+  },
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -165,6 +219,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#1e293b',
+  },
+  trendSummaryValue: {
+    flexShrink: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
+    textAlign: 'right',
   },
   dateText: {
     fontSize: 13,
