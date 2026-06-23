@@ -18,6 +18,26 @@ const TASK_IDS_KEY = 'stockTaskIds';
 
 type NavProp = NativeStackNavigationProp<WatchlistStackParamList, 'Watchlist'>;
 
+function normalizeAShareCode(code: string) {
+  let normalized = code.trim().toUpperCase();
+
+  if (normalized.startsWith('SH') || normalized.startsWith('SZ')) {
+    normalized = normalized.slice(2);
+  } else if (
+    normalized.endsWith('.SH') ||
+    normalized.endsWith('.SS') ||
+    normalized.endsWith('.SZ')
+  ) {
+    normalized = normalized.slice(0, 6);
+  }
+
+  if (!/^\d{6}$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
 export default function WatchlistScreen() {
   const navigation = useNavigation<NavProp>();
   const [stocks, setStocks] = useState<Stock[]>([]);
@@ -91,8 +111,16 @@ export default function WatchlistScreen() {
   }, [loadTaskStatuses]);
 
   const handleAddStock = useCallback(async () => {
-    if (!newCode.trim() || !newName.trim()) {
-      Alert.alert('提示', '请输入股票代码和名称');
+    const normalizedCode = normalizeAShareCode(newCode);
+    const stockName = newName.trim();
+
+    if (!stockName) {
+      Alert.alert('提示', '请输入股票名称');
+      return;
+    }
+
+    if (!normalizedCode) {
+      Alert.alert('提示', '目前仅支持 6 位 A 股代码');
       return;
     }
 
@@ -106,7 +134,7 @@ export default function WatchlistScreen() {
       const response = await fetch(`${backendUrl}/api/stocks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: newCode.trim(), name: newName.trim() }),
+        body: JSON.stringify({ code: normalizedCode, name: stockName }),
       });
 
       if (response.ok) {

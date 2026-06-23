@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from app.services.market_data import get_stock_quote
+from app.services.market_data import MarketDataError, get_stock_quote
 
 router = APIRouter(prefix="/api", tags=["market"])
 
@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api", tags=["market"])
 def get_market_quote(code: str):
     try:
         quote = get_stock_quote(code)
-    except ValueError as error:
+    except MarketDataError as error:
         raise HTTPException(status_code=400, detail=str(error))
 
     return quote.to_dict()

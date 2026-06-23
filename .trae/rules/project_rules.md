@@ -79,6 +79,7 @@ d:/ai-stock-analysis/stock-analysis-reference
 - 第一阶段：FastAPI 最小后端 + 自选股 SQLite + mock 分析任务/报告
 - 第二阶段：移动端自选模块（Tab+Stack 导航、CRUD、分析链路）
 - 第三阶段：真实行情最小接入（efinance、market_data 服务层、报告展示真实行情）
+- 第四阶段：行情基础能力增强（股票代码标准化、60 秒行情缓存、前端基础校验、行情错误分类）
 
 当前后端结构：
 

@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.database import get_connection
-from app.services.market_data import get_stock_quote
+from app.services.market_data import MarketDataError, get_stock_quote
 
 router = APIRouter(prefix="/api", tags=["analysis"])
 
@@ -23,7 +23,7 @@ def create_analysis_task(analysis: AnalysisCreate):
 
     try:
         quote = get_stock_quote(analysis.stock_code)
-    except ValueError as error:
+    except MarketDataError as error:
         failed_message = str(error)
         with get_connection() as connection:
             connection.execute(
@@ -69,7 +69,7 @@ def create_analysis_task(analysis: AnalysisCreate):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                analysis.stock_code,
+                quote.code,
                 stock_name,
                 price,
                 score,
