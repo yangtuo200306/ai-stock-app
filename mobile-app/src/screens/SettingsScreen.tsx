@@ -59,8 +59,8 @@ export default function SettingsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>设置后端地址</Text>
-        <Text style={styles.description}>请输入 FastAPI 后端地址</Text>
+        <Text style={styles.title}>我的</Text>
+        <Text style={styles.description}>后端地址配置</Text>
 
         <TextInput
           style={styles.input}

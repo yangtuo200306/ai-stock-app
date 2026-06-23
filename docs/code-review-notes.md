@@ -151,3 +151,30 @@
 - 影响：如果直接调用分析接口传入 `SH600519` 等格式，任务里的股票代码和报告里的股票代码可能不一致。
 - 当前是否需要立即修：否。
 - 后续建议：后续讨论是否让成功任务也保存标准化代码，或额外保留原始输入字段。
+
+## 问题 17：历史报告列表接口暂不返回价格
+
+- 位置：`backend/app/api/reports.py`、`mobile-app/src/screens/ReportHistoryScreen.tsx`
+- 类型：阶段性限制
+- 现象：`GET /api/reports` 当前只返回 `id`、`stock_code`、`stock_name`、`score`、`action`、`trend`、`created_at`，没有返回 `price`。
+- 影响：历史报告列表页暂时无法展示“当前价格”，只能在报告详情页查看价格。
+- 当前是否需要立即修：否，本阶段先完成历史报告最小列表闭环。
+- 后续建议：如果历史列表需要展示行情摘要，可在 `GET /api/reports` 中补充 `price` 字段，或设计更明确的报告列表摘要接口。
+
+## 问题 18：ReportDetailScreen 的路由参数类型未集中复用
+
+- 位置：`mobile-app/src/screens/ReportDetailScreen.tsx`、`mobile-app/src/types/index.ts`
+- 类型：类型设计隐患
+- 现象：`ReportDetailScreen` 为了同时支持自选模块和报告模块，使用了局部路由类型 `{ ReportDetail: { reportId: number } }`，没有集中复用统一的报告详情参数类型。
+- 影响：当前不影响运行，但如果后续多个 Stack 中的 `ReportDetail` 参数定义不一致，可能导致类型维护成本增加。
+- 当前是否需要立即修：否，本阶段先保持最小改动。
+- 后续建议：后续可抽出统一的 `ReportDetailParams` 类型，并让 `WatchlistStackParamList` 和 `ReportStackParamList` 共同复用。
+
+## 问题 19：“我的”页面暂时复用 SettingsScreen
+
+- 位置：`mobile-app/src/navigation/AppNavigator.tsx`、`mobile-app/src/screens/SettingsScreen.tsx`
+- 类型：阶段性限制
+- 现象：底部 Tab 已显示为“我的”，但实际组件仍是 `SettingsScreen`，页面内容主要是后端地址配置和连接测试。
+- 影响：当前能满足开发调试需要，但还不是真正的个人中心，也没有登录、注册、账号信息等能力。
+- 当前是否需要立即修：否，本阶段只做导航方向调整和历史报告闭环。
+- 后续建议：实现账号体系时再设计 `MineScreen` 或个人中心 Stack，并将当前设置能力迁移进去。

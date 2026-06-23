@@ -28,15 +28,30 @@ export interface Report {
   created_at: string;
 }
 
+export interface ReportHistoryItem {
+  id: number;
+  stock_code: string;
+  stock_name: string;
+  score: number;
+  action: string;
+  trend: string;
+  created_at: string;
+}
+
 export type RootTabParamList = {
   自选: undefined;
   问股: undefined;
-  大盘: undefined;
-  设置: undefined;
+  报告: undefined;
+  我的: undefined;
 };
 
 export type WatchlistStackParamList = {
   Watchlist: undefined;
   TaskStatus: { taskId: string; stockCode: string };
+  ReportDetail: { reportId: number };
+};
+
+export type ReportStackParamList = {
+  ReportHistory: undefined;
   ReportDetail: { reportId: number };
 };

@@ -32,6 +32,10 @@
 - 优先做最小可运行版本。
 - 不要一次性写太多复杂代码。
 - 做完后带用户验证结果，并解释成功输出代表什么。
+- 每次按计划执行完代码修改后，进入审查模式前，必须先协助用户学习本次修改内容。
+- 学习过程要结合实际修改文件和代码，按用户节奏拆开讲解，并鼓励用户复述理解。
+- 学习过程中发现的问题、隐患、阶段性限制和后续优化点，要记录到 `docs/code-review-notes.md`。
+- 完成学习和必要记录后，再进入审查模式逐项核对计划。
 - 出现报错时，先解释报错含义，再给解决步骤。
 
 ## 4. 项目技术栈
@@ -74,12 +78,21 @@ d:/ai-stock-analysis/stock-analysis-reference
 
 ## 6. 当前项目事实
 
+产品定位：
+
+- AI Stock App 是 AI 股票分析助手，不是投资交易软件。
+- 核心能力方向：自选股票、AI 问答、历史分析报告、个人账号。
+- 长期底部导航方向：自选 | 问股 | 报告 | 我的。
+- “我的”承接当前设置页能力，后续扩展登录、注册、账号信息。
+- “大盘”短期不作为底部 Tab；后续可放入问股或报告，例如问大盘、每日市场复盘。
+
 已完成阶段：
 
 - 第一阶段：FastAPI 最小后端 + 自选股 SQLite + mock 分析任务/报告
 - 第二阶段：移动端自选模块（Tab+Stack 导航、CRUD、分析链路）
 - 第三阶段：真实行情最小接入（efinance、market_data 服务层、报告展示真实行情）
 - 第四阶段：行情基础能力增强（股票代码标准化、60 秒行情缓存、前端基础校验、行情错误分类）
+- 第五阶段：历史报告列表 + 新导航结构（自选 | 问股 | 报告 | 我的）
 
 当前后端结构：
 
@@ -110,6 +123,7 @@ mobile-app/
     navigation/
       AppNavigator.tsx
       WatchlistStackNavigator.tsx
+      ReportStackNavigator.tsx
     screens/
       WatchlistScreen.tsx
       SettingsScreen.tsx
@@ -117,6 +131,7 @@ mobile-app/
       MarketScreen.tsx
       TaskStatusScreen.tsx
       ReportDetailScreen.tsx
+      ReportHistoryScreen.tsx
     types/
       index.ts
 ```

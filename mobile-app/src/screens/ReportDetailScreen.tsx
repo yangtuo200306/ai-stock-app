@@ -3,11 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
-import type { Report, WatchlistStackParamList } from '../types';
+import type { Report } from '../types';
 
 const BACKEND_URL_STORAGE_KEY = 'backendUrl';
 
-type RouteType = RouteProp<WatchlistStackParamList, 'ReportDetail'>;
+type RouteType = RouteProp<{ ReportDetail: { reportId: number } }, 'ReportDetail'>;
 
 export default function ReportDetailScreen() {
   const route = useRoute<RouteType>();
