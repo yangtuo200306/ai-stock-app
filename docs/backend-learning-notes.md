@@ -742,3 +742,83 @@ report_id = 连接任务和报告的编号
 - 更新项目规则和学习计划。
 - push 当前后端成果。
 - 下一阶段开始 React Native 手机 APP 页面。
+
+## 2026-06-23：真实行情最小接入
+
+### 本阶段完成了什么
+
+- 新增 `backend/app/services/market_data.py`，作为行情服务层。
+- 新增 `backend/app/api/market.py`，提供 `GET /api/market/quote/{code}` 行情测试接口。
+- 在 `backend/app/main.py` 注册 `market_router`。
+- 在 `backend/requirements.txt` 加入 `efinance`。
+- 修改 `POST /api/analysis`，从纯 mock 报告升级为使用真实行情生成报告。
+- 验证 `600519` 能返回贵州茅台真实行情，并在移动端报告详情展示。
+
+### 本阶段核心流程
+
+```text
+POST /api/analysis
+  ↓
+analysis.py 调用 get_stock_quote(stock_code)
+  ↓
+market_data.py 调用 efinance
+  ↓
+返回 StockQuote
+  ↓
+analysis.py 保存 reports 和 analysis_tasks
+  ↓
+移动端查询并展示报告
+```
+
+### 新学到的后端概念
+
+#### 服务层
+
+`market_data.py` 不直接处理 HTTP 请求，也不直接操作数据库。
+
+它只负责：
+
+```text
+输入股票代码
+获取真实行情
+返回统一 StockQuote
+```
+
+这样可以让：
+
+```text
+analysis.py 负责分析任务
+market_data.py 负责行情数据
+```
+
+#### 第三方接口不稳定
+
+真实行情依赖：
+
+```text
+efinance -> 东方财富接口
+```
+
+第三方接口可能出现连接失败、断开、超时或返回空数据。
+
+因此后端需要把第三方异常转换为业务错误，不能直接让 FastAPI 返回 500。
+
+#### 失败任务也要持久化
+
+行情失败时，也应写入 `analysis_tasks`：
+
+```text
+status = failed
+progress = 0
+message = 错误原因
+report_id = None
+```
+
+这样前端拿到 `task_id` 后仍然能查询任务状态。
+
+### 当前限制
+
+- 仅支持 6 位 A 股代码。
+- 当前使用 `ef.stock.get_realtime_quotes()`，可能拉取全市场行情。
+- 综合评分和操作建议仍是简单固定值。
+- 趋势判断只基于涨跌幅，尚未接入技术指标。

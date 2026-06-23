@@ -11,7 +11,7 @@
 - Git 项目管理；
 - AI 协作开发。
 
-用户当前更重视“理解为什么”，不是只追求快速写完功能。
+用户当前更重视"理解为什么"，不是只追求快速写完功能。
 
 ## 2. 用户学习偏好
 
@@ -38,8 +38,10 @@
 
 - 后端：Python FastAPI；
 - 后端服务启动：uvicorn；
-- 数据库计划：SQLite；
+- 数据库：SQLite；
+- 行情数据源：efinance；
 - 手机 APP：React Native；
+- 移动端导航：@react-navigation（Tab + Stack）；
 - Git 远程仓库：GitHub；
 - 原参考项目：只读参考，不修改。
 
@@ -65,28 +67,18 @@ d:/ai-stock-analysis/stock-analysis-reference
 - `mobile-app/` 后续放移动端代码。
 - `docs/learning-plan.md` 是学习计划，不要重复复制它的内容。
 - `docs/backend-learning-notes.md` 是后端学习笔记。
+- `docs/frontend-learning-notes.md` 是前端学习笔记。
+- `docs/code-review-notes.md` 是代码问题隐患记录。
+- `docs/common-issues.md` 是常见问题与排查手册。
 - `.trae/rules/project_rules.md` 是 AI 协作规则文件。
 
 ## 6. 当前项目事实
 
-已完成：
+已完成阶段：
 
-- FastAPI 最小后端；
-- `GET /api/health` 健康检查接口；
-- 自选股内存版小闭环；
-- 自选股 SQLite 持久化保存；
-- `GET /api/stocks` 查看自选股列表；
-- `POST /api/stocks` 添加自选股；
-- `DELETE /api/stocks/{code}` 删除自选股；
-- mock 分析任务小闭环；
-- `POST /api/analysis` 创建分析任务；
-- `GET /api/analysis/{task_id}` 查询分析任务状态；
-- mock 报告闭环；
-- `GET /api/reports` 查询历史报告；
-- `GET /api/reports/{report_id}` 查询报告详情；
-- 本地验证成功；
-- Git 提交并推送成功；
-- 后端学习笔记文件已更新。
+- 第一阶段：FastAPI 最小后端 + 自选股 SQLite + mock 分析任务/报告
+- 第二阶段：移动端自选模块（Tab+Stack 导航、CRUD、分析链路）
+- 第三阶段：真实行情最小接入（efinance、market_data 服务层、报告展示真实行情）
 
 当前后端结构：
 
@@ -100,37 +92,32 @@ backend/
       __init__.py
       health.py
       stocks.py
+      analysis.py
+      reports.py
+      market.py
+    services/
+      __init__.py
+      market_data.py
 ```
 
-当前接口：
+当前移动端结构：
 
 ```text
-GET     /api/health
-GET     /api/stocks
-POST    /api/stocks
-DELETE  /api/stocks/{code}
-```
-
-当前自选股数据保存方式：
-
-```text
-内存列表 stocks = []
-```
-
-注意：
-
-```text
-服务重启后，自选股数据会清空。
-下一阶段建议学习 SQLite 数据库，实现持久化保存。
-```
-
-已推送提交：
-
-```text
-3676dca feat: add FastAPI health endpoint
-0d9a665 feat: add stocks list endpoint
-bfb92d0 feat: add in-memory stock management
-f972ca4 docs: update learning notes and collaboration rules
+mobile-app/
+  App.tsx
+  src/
+    navigation/
+      AppNavigator.tsx
+      WatchlistStackNavigator.tsx
+    screens/
+      WatchlistScreen.tsx
+      SettingsScreen.tsx
+      AskScreen.tsx
+      MarketScreen.tsx
+      TaskStatusScreen.tsx
+      ReportDetailScreen.tsx
+    types/
+      index.ts
 ```
 
 ## 7. Git 协作约定
@@ -148,16 +135,15 @@ f972ca4 docs: update learning notes and collaboration rules
 - 创建/修改文档前先询问用户。
 - `docs/learning-plan.md` 只作为学习计划。
 - `docs/backend-learning-notes.md` 记录实际学到的后端知识。
+- `docs/frontend-learning-notes.md` 记录实际学到的前端知识。
+- `docs/code-review-notes.md` 记录代码阅读中发现的问题和隐患。
+- `docs/common-issues.md` 记录多次出现的常见问题和排查方式。
 - `.trae/rules/project_rules.md` 记录 AI 协作规则和项目上下文。
 
 ## 9. 复习与学习目标规划
 
-- 不必重复复习刚刚学完、用户仍然记得的内容。
-- 在进入新阶段、新功能或间隔较久后，主动安排简短复习。
-- 复习优先采用提问方式，让用户先用自己的话回答，再进行纠正。
-- 根据用户在学习过程中的问题、卡点和兴趣，主动补充新的长期学习目标。
-- 新学习目标应优先围绕：AI 协作开发、后端调试、API 设计、项目化学习、代码阅读能力。
-- 每次新增长期学习目标时，先和用户确认，再更新本文件。
+- 刚学完的内容不重复复习，进入新阶段或间隔较久后主动安排简短复习。
+- 新学习目标先和用户确认再更新到本文件。
 
 ## 10. 长期学习目标
 
@@ -171,10 +157,8 @@ f972ca4 docs: update learning notes and collaboration rules
 
 新对话开始时，AI 应优先参考：
 
-```text
-.trae/rules/project_rules.md
-docs/backend-learning-notes.md
-docs/learning-plan.md
-```
+1. `.trae/rules/project_rules.md` — 协作规则和项目事实
+2. `docs/learning-plan.md` — 当前阶段和下一步
+3. `docs/code-review-notes.md` — 待修复问题清单
 
-然后继续按“慢速、互动、教学型”的方式协助用户。
+然后先确认用户当前想做什么，再按对应模式工作。

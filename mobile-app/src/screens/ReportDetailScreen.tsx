@@ -80,6 +80,42 @@ export default function ReportDetailScreen() {
           <Text style={styles.value}>{report.trend}</Text>
         </View>
 
+        {report.indicators?.change_pct != null && (
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>涨跌幅</Text>
+            <Text
+              style={[
+                styles.value,
+                {
+                  color:
+                    Number(report.indicators.change_pct) > 0
+                      ? '#dc2626'
+                      : Number(report.indicators.change_pct) < 0
+                        ? '#16a34a'
+                        : '#1e293b',
+                },
+              ]}
+            >
+              {Number(report.indicators.change_pct) > 0 ? '+' : ''}
+              {String(report.indicators.change_pct)}%
+            </Text>
+          </View>
+        )}
+
+        {report.indicators?.source != null && (
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>数据来源</Text>
+            <Text style={styles.value}>{String(report.indicators.source)}</Text>
+          </View>
+        )}
+
+        {report.indicators?.fetched_at != null && (
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>行情获取时间</Text>
+            <Text style={styles.value}>{String(report.indicators.fetched_at)}</Text>
+          </View>
+        )}
+
         <Text style={styles.sectionTitle}>摘要</Text>
         <Text style={styles.summaryText}>{report.summary}</Text>
 

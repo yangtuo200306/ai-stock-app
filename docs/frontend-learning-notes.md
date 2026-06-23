@@ -565,3 +565,75 @@ Tab + Stack 导航结构通过
 报告记录是真实写入 SQLite
 但报告内容本身仍是模拟生成
 ```
+
+## 2026-06-23：第三阶段，报告详情展示真实行情
+
+### 本阶段前端变化
+
+第三阶段主要改动在后端，移动端只做了小范围展示增强。
+
+修改页面：
+
+```text
+ReportDetailScreen
+```
+
+新增展示字段：
+
+```text
+涨跌幅
+数据来源
+行情获取时间
+```
+
+这些字段来自后端报告的：
+
+```text
+report.indicators.change_pct
+report.indicators.source
+report.indicators.fetched_at
+```
+
+### 展示效果
+
+报告详情页现在可以看到：
+
+```text
+贵州茅台 (600519)
+当前价格 1236.99
+涨跌幅 -0.36%
+数据来源 efinance
+行情获取时间 2026-06-23T...
+```
+
+### 新学到的前端点
+
+#### unknown 需要转换后展示
+
+当前类型定义是：
+
+```text
+indicators: Record<string, unknown>
+```
+
+所以前端不能直接把 `unknown` 放进 `Text`，需要使用：
+
+```text
+String(...)
+```
+
+#### 红涨绿跌
+
+涨跌幅展示使用 A 股常见习惯：
+
+```text
+上涨：红色
+下跌：绿色
+平盘：深色
+```
+
+### 当前限制
+
+- `indicators` 类型仍然比较松散。
+- 如果后端字段名变化，前端不会提前发现。
+- 后续可以定义更明确的 `ReportIndicators` 类型。
