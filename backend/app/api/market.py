@@ -10,6 +10,6 @@ def get_market_quote(code: str):
     try:
         quote = get_stock_quote(code)
     except MarketDataError as error:
-        raise HTTPException(status_code=400, detail=str(error))
+        raise HTTPException(status_code=400, detail={"error_code": "MARKET_DATA_ERROR", "message": str(error)})
 
     return quote.to_dict()

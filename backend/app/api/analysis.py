@@ -1,7 +1,7 @@
 import json
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.database import get_current_user_id, get_connection
@@ -35,10 +35,10 @@ def _write_analysis_record(report: dict, task_id: str, user_id: str):
             """,
             (
                 user_id,
-                "analysis",
+                "report",
                 report["stock_code"],
                 report["stock_name"],
-                f"自选分析：{report['stock_name']}（{report['stock_code']}）",
+                f"报告：{report['stock_name']}（{report['stock_code']}）",
                 report["summary"],
                 report.get("report_id"),
                 json.dumps(metadata, ensure_ascii=False),
@@ -75,7 +75,8 @@ def create_analysis_task(analysis: AnalysisCreate, user_id: str = Depends(get_cu
             "status": "failed",
             "progress": 0,
             "report_id": None,
-            "error": failed_message,
+            "error_code": "MARKET_DATA_ERROR",
+            "message": failed_message,
         }
 
     try:
@@ -100,7 +101,8 @@ def create_analysis_task(analysis: AnalysisCreate, user_id: str = Depends(get_cu
             "status": "failed",
             "progress": 0,
             "report_id": None,
-            "error": failed_message,
+            "error_code": "MARKET_DATA_ERROR",
+            "message": failed_message,
         }
 
     technicals = build_technical_indicators(quote.price, history)
@@ -166,10 +168,10 @@ def get_analysis_task(task_id: str, user_id: str = Depends(get_current_user_id))
         ).fetchone()
 
     if row is None:
-        return {
-            "message": "task not found",
-            "task_id": task_id,
-        }
+        raise HTTPException(
+            status_code=404,
+            detail={"error_code": "TASK_NOT_FOUND", "message": "任务不存在"},
+        )
 
     return {
         "task_id": row["task_id"],

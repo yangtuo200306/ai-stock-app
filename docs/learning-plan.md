@@ -382,7 +382,10 @@ v0.6 已完成：AI 助手能力增强
    - 学习内容：ask_sessions / ask_messages 两层会话结构、records 作为历史摘要入口、最小多轮追问、股票简称识别、RSI、成交量变化、AI 上下文边界、问股页从单结果演进为消息列表。
    - 新增问题：16 条（问题 72-87），已记录到 code-review-notes.md。
    - 总结文档：docs/releases/v0.6-summary.md。
-4. v0.7：功能定型与交互补齐，学习未登录态引导、新建会话、记录详情继续追问、records 更新时间排序、API 错误结构统一和 ask service 拆分。
+4. v0.7：功能定型与交互补齐 ✅ 已完成
+   - 学习内容：数据库迁移（ALTER TABLE ADD COLUMN + 回填旧数据）、排序策略（ORDER BY updated_at DESC, id DESC）、服务层拆分（API 层 vs service 层）、未登录态声明式引导、跨 Tab 导航、路由参数设计、API 错误结构统一、降级机制、answer_type 和 ai_status 语义分工、会话隔离、报告作为记录类型、后端聚合查询、死代码清理、前后端消息同步（session_id 作为对话房间号）。
+   - 新增问题：32 条（问题 88-119），已记录到 code-review-notes.md。
+   - 总结文档：docs/releases/v0.7-summary.md。
 5. v0.8：UI/UX 集中优化，学习移动端页面结构、加载态、空状态、错误态和长回答阅读体验。
 
 ## 9. 和 AI 助手协作方式

@@ -72,7 +72,7 @@ def _migrate_stocks_table(connection):
 def get_current_user_id(authorization: str = Header(...)) -> str:
     """Extract current user ID from Authorization header."""
     if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="invalid token format")
+        raise HTTPException(status_code=401, detail={"error_code": "INVALID_TOKEN_FORMAT", "message": "Token 格式无效"})
 
     token = authorization[7:]
     with get_connection() as connection:
@@ -82,7 +82,7 @@ def get_current_user_id(authorization: str = Header(...)) -> str:
         ).fetchone()
 
     if row is None:
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail={"error_code": "INVALID_TOKEN", "message": "Token 无效，请重新登录"})
 
     return str(row["user_id"])
 
@@ -183,6 +183,10 @@ def init_db():
             """
         )
         ensure_column(connection, "records", "session_id", "TEXT")
+        ensure_column(connection, "records", "updated_at", "TEXT")
+        connection.execute(
+            "UPDATE records SET updated_at = created_at WHERE updated_at IS NULL"
+        )
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS ask_sessions (

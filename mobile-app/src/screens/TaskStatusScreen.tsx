@@ -3,15 +3,20 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { apiGet } from '../api/client';
-import type { AnalysisTask, WatchlistStackParamList } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import type { AnalysisTask, WatchlistStackParamList, RootTabParamList } from '../types';
 
 type RouteType = RouteProp<WatchlistStackParamList, 'TaskStatus'>;
 type NavProp = NativeStackNavigationProp<WatchlistStackParamList, 'TaskStatus'>;
+type TabNavProp = BottomTabNavigationProp<RootTabParamList>;
 
 export default function TaskStatusScreen() {
   const route = useRoute<RouteType>();
   const navigation = useNavigation<NavProp>();
+  const tabNavigation = useNavigation<TabNavProp>();
+  const { isLoggedIn, isLoading: authLoading } = useAuth();
   const { taskId, stockCode } = route.params;
   const [task, setTask] = useState<AnalysisTask | null>(null);
   const [error, setError] = useState('');
@@ -25,8 +30,8 @@ export default function TaskStatusScreen() {
       } else {
         setError('任务不存在');
       }
-    } catch {
-      setError('查询任务状态失败');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '查询任务状态失败');
     }
   };
 
@@ -63,6 +68,26 @@ export default function TaskStatusScreen() {
         return '#64748b';
     }
   };
+
+  if (authLoading) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loadingText}>加载中...</Text>
+      </View>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loginTitle}>请先登录</Text>
+        <Text style={styles.loginDescription}>登录后可以使用自选、问股和记录功能。</Text>
+        <Pressable style={styles.loginButton} onPress={() => tabNavigation.navigate('我的', { screen: 'Login' })}>
+          <Text style={styles.loginButtonText}>去登录</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -107,6 +132,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    padding: 24,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
@@ -189,6 +220,30 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#0369a1',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  loginTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0f172a',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  loginDescription: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  loginButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  loginButtonText: {
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
   },

@@ -790,3 +790,292 @@
 - 影响：功能可用，但操作不够顺滑，体验不像成熟 AI 助手。
 - 当前是否需要立即修：否，v0.6 先完成功能闭环。
 - 后续建议：v0.8 UI/UX 集中优化时统一处理问股页体验。
+
+## 问题 88：用户 ID 字段类型不完全统一
+
+- 位置：`backend/app/database.py`
+- 类型：数据模型隐患
+- 现象：`tokens.user_id` 是 INTEGER，而业务表中的 `user_id` 多数是 TEXT。当前通过 `str(row["user_id"])` 做兼容。
+- 影响：短期可用，但数据模型不完全统一，后续维护或迁移时容易困惑。
+- 当前是否需要立即修：否。
+- 后续建议：后续统一 user_id 字段类型，或明确 token 表与业务表之间的转换规则。
+
+## 问题 89：records.updated_at 依赖 TEXT 时间字符串排序
+
+- 位置：`backend/app/database.py`、`backend/app/api/records.py`
+- 类型：时间字段设计隐患
+- 现象：`updated_at` 使用 TEXT 保存 `CURRENT_TIMESTAMP`，排序依赖字符串格式统一。
+- 影响：当前 SQLite 默认时间格式可排序；未来如果混入不同格式或时区格式，排序可能异常。
+- 当前是否需要立即修：否。
+- 后续建议：后续统一时间格式，必要时使用 ISO 8601 或时间戳。
+
+## 问题 90：records.updated_at 回填逻辑每次启动都会执行检查
+
+- 位置：`backend/app/database.py`
+- 类型：迁移性能隐患
+- 现象：`UPDATE records SET updated_at = created_at WHERE updated_at IS NULL` 会在每次 `init_db()` 执行。
+- 影响：当前数据量小可接受；数据量大后启动时可能有性能成本。
+- 当前是否需要立即修：否。
+- 后续建议：后续引入版本化迁移机制，避免每次启动重复执行迁移 SQL。
+
+## 问题 91：GET /api/records 暂无分页
+
+- 位置：`backend/app/api/records.py`
+- 类型：列表性能隐患
+- 现象：记录列表使用 `fetchall()` 一次性返回当前用户所有记录。
+- 影响：记录少时没问题；记录变多后可能影响接口性能和前端渲染。
+- 当前是否需要立即修：否。
+- 后续建议：后续增加分页参数，例如 `limit`、`offset` 或基于游标的分页。
+
+## 问题 92：记录详情不存在时仍返回 200 风格对象
+
+- 位置：`backend/app/api/records.py`
+- 类型：接口语义隐患
+- 现象：record 不存在时返回 `{ error_code, message }` 普通对象，而不是 `HTTPException(status_code=404, ...)`。
+- 影响：前端能识别错误内容，但 HTTP 状态码语义不够准确。
+- 当前是否需要立即修：否。
+- 后续建议：后续统一 not found 类接口为 404。
+
+## 问题 93：记录详情一次性返回全部 messages
+
+- 位置：`backend/app/api/records.py`
+- 类型：长会话性能隐患
+- 现象：记录详情会一次性返回某个 `session_id` 下的所有 `ask_messages`。
+- 影响：短会话没问题；长会话消息很多时可能响应变慢。
+- 当前是否需要立即修：否。
+- 后续建议：后续支持消息分页，或默认加载最近 N 条后再按需加载历史。
+
+## 问题 94：ask_service 使用下划线函数名但跨文件导入
+
+- 位置：`backend/app/services/ask_service.py`、`backend/app/api/ask.py`
+- 类型：命名语义隐患
+- 现象：`_create_ask_session`、`_write_ask_message` 等函数以下划线开头，但被 `ask.py` 跨文件导入使用。
+- 影响：下划线通常表示模块内部函数，跨文件使用会让语义不够清晰。
+- 当前是否需要立即修：否。
+- 后续建议：后续可去掉下划线，或明确 service 对外函数命名规范。
+
+## 问题 95：ask 流程仍非严格单事务
+
+- 位置：`backend/app/api/ask.py`、`backend/app/services/ask_service.py`
+- 类型：数据一致性隐患
+- 现象：创建/更新 session、写 user message、写 assistant message、写/更新 record 分别打开连接执行。
+- 影响：如果中途失败，可能出现 session、messages、records 不完全一致。
+- 当前是否需要立即修：否。
+- 后续建议：后续将同一次问股保存过程放入同一个事务边界。
+
+## 问题 96：_update_ask_session 未直接带 user_id 条件
+
+- 位置：`backend/app/services/ask_service.py`
+- 类型：用户隔离防御性隐患
+- 现象：`_update_ask_session` 只按 `session_id` 更新。当前调用前已通过 `session_id + user_id` 查询校验。
+- 影响：正常流程安全；如果未来其他地方直接调用该函数，防御性不足。
+- 当前是否需要立即修：否。
+- 后续建议：后续将 `user_id` 也作为更新条件。
+
+## 问题 97：_get_ask_messages 先全量 fetchall 再截取最近 N 条
+
+- 位置：`backend/app/services/ask_service.py`
+- 类型：性能隐患
+- 现象：先取出某个会话全部消息，再用 `messages[-limit:]` 截取最近几条。
+- 影响：短会话可接受；长会话下会浪费查询和内存。
+- 当前是否需要立即修：否。
+- 后续建议：后续改成 SQL 层 `ORDER BY id DESC LIMIT ?` 后再反转。
+
+## 问题 98：继续追问时 records 缺失无补偿逻辑
+
+- 位置：`backend/app/services/ask_service.py`
+- 类型：数据修复隐患
+- 现象：继续追问时只 `UPDATE records WHERE session_id = ? AND user_id = ?`，如果 records 对应行丢失，不会自动补建。
+- 影响：极端情况下可能出现有会话和消息，但记录列表没有入口。
+- 当前是否需要立即修：否。
+- 后续建议：后续检查 `rowcount`，必要时补建记录。
+
+## 问题 99：问股摘要使用简单 `answer[:80]`
+
+- 位置：`backend/app/services/ask_service.py`
+- 类型：摘要质量限制
+- 现象：记录摘要直接截取回答前 80 个字符。
+- 影响：可能截断语义、Markdown 或中文句子。
+- 当前是否需要立即修：否。
+- 后续建议：后续用更清晰的摘要生成规则，例如按句号截断或单独生成 summary。
+
+## 问题 100：ask.py 仍直接读取环境变量
+
+- 位置：`backend/app/api/ask.py`
+- 类型：配置管理隐患
+- 现象：`os.environ.get("LLM_MODEL")` 直接出现在 API 主流程中。
+- 影响：配置读取分散，后续配置项变多后不易管理。
+- 当前是否需要立即修：否。
+- 后续建议：后续抽出 settings/config 模块。
+
+## 问题 101：ask.py 主流程仍偏长
+
+- 位置：`backend/app/api/ask.py`
+- 类型：代码结构限制
+- 现象：虽然已抽出会话、消息、记录函数，但行情、技术指标、AI 调用、保存流程仍在一个接口函数中编排。
+- 影响：后续 AI 能力继续增强时，接口函数仍可能变复杂。
+- 当前是否需要立即修：否。
+- 后续建议：后续可进一步抽出 `ask_flow_service`。
+
+## 问题 102：AI 失败未记录后端日志
+
+- 位置：`backend/app/api/ask.py`
+- 类型：调试隐患
+- 现象：`except LlmError: pass` 直接吞掉异常。
+- 影响：前端体验良好，但后端排查 AI 失败原因困难。
+- 当前是否需要立即修：否。
+- 后续建议：后续记录安全的后端日志，不返回底层错误给前端。
+
+## 问题 103：answer_type 和 ai_status 语义仍有重叠
+
+- 位置：`backend/app/api/ask.py`、`mobile-app/src/types/index.ts`
+- 类型：字段语义隐患
+- 现象：当前 `answer_type=ai/rule` 与 `ai_status=ok/fallback` 高度相关。
+- 影响：短期可用；前端和后端需要明确各自语义，避免后续混用。
+- 当前是否需要立即修：否。
+- 后续建议：后续明确前端展示主要依赖 `answer_type`，AI 调用状态主要依赖 `ai_status`。
+
+## 问题 104：AskResponse 只返回 assistant message_id
+
+- 位置：`backend/app/api/ask.py`、`mobile-app/src/screens/AskScreen.tsx`
+- 类型：前后端消息同步隐患
+- 现象：`message_id` 只代表 assistant 消息，user 消息仍由前端用 `Date.now()` 临时生成。
+- 影响：前端展示可用，但前后端消息 ID 不完全一致。
+- 当前是否需要立即修：否。
+- 后续建议：后续返回 `user_message_id` 和 `assistant_message_id`。
+
+## 问题 105：问股页新建会话可能重新应用旧 route params
+
+- 位置：`mobile-app/src/screens/AskScreen.tsx`
+- 类型：导航状态隐患
+- 现象：`handleNewSession` 会将 `initialParamsHandled.current` 重置为 `false`，如果 `route.params` 仍保留旧 `sessionId`，可能再次应用旧参数。
+- 影响：部分导航场景下可能清空后又恢复旧会话。
+- 当前是否需要立即修：否。
+- 后续建议：后续新建会话时同步清理 route params，或不要重置该 ref。
+
+## 问题 106：问股页仍无完整会话恢复能力
+
+- 位置：`mobile-app/src/screens/AskScreen.tsx`
+- 类型：前端会话体验限制
+- 现象：从记录详情可以带 `initialMessages` 过来，但刷新页面后不会自动按 `sessionId` 拉取历史。
+- 影响：最小继续追问可用，但还不是完整会话恢复体验。
+- 当前是否需要立即修：否。
+- 后续建议：后续新增按 `session_id` 查询消息接口，问股页自行加载。
+
+## 问题 107：RecordDetailScreen 跨 Tab 跳转使用 any
+
+- 位置：`mobile-app/src/screens/RecordDetailScreen.tsx`
+- 类型：导航类型隐患
+- 现象：继续追问跳转问股 Tab 使用 `useNavigation<any>()`。
+- 影响：参数名或路由名写错时，TypeScript 不一定能提前发现。
+- 当前是否需要立即修：否。
+- 后续建议：后续补充组合导航类型。
+
+## 问题 108：问股路由参数可能继续膨胀
+
+- 位置：`mobile-app/src/types/index.ts`
+- 类型：类型维护隐患
+- 现象：问股路由参数已经包括 `initialQuestion`、`sessionId`、`initialMessages`。
+- 影响：后续参数继续增加时，RootTabParamList 会变复杂。
+- 当前是否需要立即修：否。
+- 后续建议：后续单独定义 `AskRouteParams` 类型。
+
+## 问题 109：通过导航参数传 initialMessages 可能过大
+
+- 位置：`mobile-app/src/screens/RecordDetailScreen.tsx`、`mobile-app/src/screens/AskScreen.tsx`
+- 类型：导航数据隐患
+- 现象：记录详情继续追问时把 `initialMessages` 直接作为导航参数传给问股页。
+- 影响：短会话可接受；长会话可能导致导航参数过大。
+- 当前是否需要立即修：否。
+- 后续建议：后续只传 `sessionId`，由问股页通过接口拉取消息。
+
+## 问题 110：GET /api/stocks 聚合职责增加
+
+- 位置：`backend/app/api/stocks.py`
+- 类型：接口职责扩展隐患
+- 现象：`GET /api/stocks` 不再只是自选列表，还负责聚合最近记录摘要。
+- 影响：当前体验更好；后续摘要逻辑复杂后，`stocks.py` 可能变重。
+- 当前是否需要立即修：否。
+- 后续建议：后续抽出 stock summary service。
+
+## 问题 111：自选最近记录查询后续可能需要索引
+
+- 位置：`backend/app/api/stocks.py`、`backend/app/database.py`
+- 类型：查询性能隐患
+- 现象：自选列表需要按 `user_id + stock_code + updated_at` 查最近记录。
+- 影响：数据量小时没问题；records 增多后可能查询变慢。
+- 当前是否需要立即修：否。
+- 后续建议：后续增加 `(user_id, stock_code, updated_at)` 相关索引。
+
+## 问题 112：API client 未保留 error_code
+
+- 位置：`mobile-app/src/api/client.ts`
+- 类型：前端错误处理限制
+- 现象：API client 当前只抛出 `Error(message)`，没有保留 `error_code`。
+- 影响：页面只能展示错误文案，不能根据错误码做差异化处理。
+- 当前是否需要立即修：否。
+- 后续建议：后续定义 `ApiError` 类型，保留 `error_code` 和 `message`。
+
+## 问题 113：apiDelete 失败行为发生变化
+
+- 位置：`mobile-app/src/api/client.ts`、`mobile-app/src/screens/WatchlistScreen.tsx`
+- 类型：行为兼容隐患
+- 现象：`apiDelete` 失败时会抛出 Error，而不是返回 `{ ok: false, data }`。
+- 影响：当前页面已有 catch；但调用方需要了解失败走异常流程。
+- 当前是否需要立即修：否。
+- 后续建议：后续统一 API client 方法的成功/失败返回约定。
+
+## 问题 114：未登录态缺少“去登录”按钮
+
+- 位置：多个业务页面
+- 类型：计划偏差 / 体验缺口
+- 现象：v0.7 计划要求未登录态有“去登录”按钮；当前实现只有提示文案。
+- 影响：用户知道需要登录，但不能一键跳转登录页。
+- 当前是否需要立即修：审查阶段确认。
+- 后续建议：审查阶段优先确认并补齐。
+
+## 问题 115：未登录引导 UI 重复
+
+- 位置：多个业务页面
+- 类型：前端重复逻辑
+- 现象：各业务页面分别实现“请先登录”提示。
+- 影响：短期可接受；后续调整文案或样式需要多处修改。
+- 当前是否需要立即修：否。
+- 后续建议：后续抽出 `LoginRequiredView` 组件。
+
+## 问题 116：token 运行中失效体验仍可优化
+
+- 位置：`mobile-app/src/contexts/AuthContext.tsx`、`mobile-app/src/api/client.ts`
+- 类型：认证体验隐患
+- 现象：初次恢复 token 会校验；但运行中 token 失效后，页面主要展示 API 错误。
+- 影响：用户可能不知道需要重新登录。
+- 当前是否需要立即修：否。
+- 后续建议：后续 401 时统一清 token 并提示重新登录。
+
+## 问题 117：旧 analysis 记录需长期兼容
+
+- 位置：`mobile-app/src/screens/RecordListScreen.tsx`、`mobile-app/src/screens/RecordDetailScreen.tsx`
+- 类型：历史数据兼容负担
+- 现象：新记录类型改为 `report`，旧记录仍是 `analysis`。
+- 影响：前端需要同时兼容两种类型。
+- 当前是否需要立即修：否。
+- 后续建议：后续决定是否做一次性迁移，或长期保留兼容逻辑。
+
+## 问题 118：record_type 没有枚举约束
+
+- 位置：`backend/app/api/analysis.py`、`backend/app/api/records.py`、`mobile-app/src/types/index.ts`
+- 类型：字段约束隐患
+- 现象：`record_type` 是普通字符串，前后端没有枚举约束。
+- 影响：后续类型增多时可能写错或前后端不一致。
+- 当前是否需要立即修：否。
+- 后续建议：后续定义明确的 RecordType 枚举或常量。
+
+## 问题 119：删除旧页面后仍需审查残留引用
+
+- 位置：移动端导航和 screens 目录
+- 类型：清理验证项
+- 现象：`SettingsScreen.tsx` 和 `MarketScreen.tsx` 已删除。
+- 影响：如果仍有残留 import，会导致编译失败。
+- 当前是否需要立即修：审查阶段确认。
+- 后续建议：审查阶段再次搜索确认无引用。
+

@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_current_user_id, get_connection
 
@@ -57,10 +57,10 @@ def get_report(report_id: int, user_id: str = Depends(get_current_user_id)):
         ).fetchone()
 
     if row is None:
-        return {
-            "message": "report not found",
-            "report_id": report_id,
-        }
+        raise HTTPException(
+            status_code=404,
+            detail={"error_code": "REPORT_NOT_FOUND", "message": "报告不存在"},
+        )
 
     return {
         "id": row["id"],

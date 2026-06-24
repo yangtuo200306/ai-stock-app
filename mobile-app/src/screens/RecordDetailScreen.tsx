@@ -3,15 +3,47 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useNavigation as useTabNavigation } from '@react-navigation/native';
 import { apiGet } from '../api/client';
-import type { RecordDetail as RecordDetailType, RecordStackParamList } from '../types';
+import type { RecordDetail as RecordDetailType, RecordStackParamList, RootTabParamList } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 type RouteType = RouteProp<RecordStackParamList, 'RecordDetail'>;
 type NavProp = NativeStackNavigationProp<RecordStackParamList, 'RecordDetail'>;
+type TabNavProp = BottomTabNavigationProp<RootTabParamList>;
+
+function getTypeLabel(recordType: string): string {
+  switch (recordType) {
+    case 'ask':
+      return '问股';
+    case 'report':
+      return '报告';
+    case 'analysis':
+      return '分析';
+    default:
+      return recordType;
+  }
+}
+
+function getTypeColor(recordType: string): string {
+  switch (recordType) {
+    case 'ask':
+      return '#2563eb';
+    case 'report':
+      return '#7c3aed';
+    case 'analysis':
+      return '#64748b';
+    default:
+      return '#64748b';
+  }
+}
 
 export default function RecordDetailScreen() {
   const route = useRoute<RouteType>();
   const navigation = useNavigation<NavProp>();
+  const tabNavigation = useTabNavigation<any>();
+  const { isLoggedIn, isLoading: authLoading } = useAuth();
   const { recordId } = route.params;
   const [record, setRecord] = useState<RecordDetailType | null>(null);
   const [error, setError] = useState('');
@@ -23,10 +55,10 @@ export default function RecordDetailScreen() {
         if (data.id) {
           setRecord(data as RecordDetailType);
         } else {
-          setError('记录不存在');
+          setError(data.message || '记录不存在');
         }
-      } catch {
-        setError('获取记录失败');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : '获取记录失败');
       }
     };
 
@@ -40,6 +72,28 @@ export default function RecordDetailScreen() {
         ? '#16a34a'
         : '#475569'
     : '#475569';
+
+  const displayTime = record?.updated_at || record?.created_at;
+
+  if (authLoading) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.loadingText}>加载中...</Text>
+      </View>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.loginTitle}>请先登录</Text>
+        <Text style={styles.loginDescription}>登录后可以使用自选、问股和记录功能。</Text>
+        <Pressable style={styles.loginButton} onPress={() => tabNavigation.navigate('我的', { screen: 'Login' })}>
+          <Text style={styles.loginButtonText}>去登录</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (error) {
     return (
@@ -60,9 +114,11 @@ export default function RecordDetailScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.typeLabel}>
-          {record.record_type === 'ask' ? '问股' : '自选分析'}
-        </Text>
+        <View style={styles.typeBadge}>
+          <Text style={[styles.typeLabel, { color: getTypeColor(record.record_type) }]}>
+            {getTypeLabel(record.record_type)}
+          </Text>
+        </View>
         <Text style={styles.stockName}>
           {record.stock_name}（{record.stock_code}）
         </Text>
@@ -87,7 +143,7 @@ export default function RecordDetailScreen() {
           </View>
         ) : null}
 
-        {/* Fallback for old records without messages */}
+        {/* Fallback for old ask records without messages */}
         {record.record_type === 'ask' && (!record.messages || record.messages.length === 0) ? (
           <>
             {record.question ? (
@@ -108,7 +164,8 @@ export default function RecordDetailScreen() {
           </>
         ) : null}
 
-        {record.record_type === 'analysis' ? (
+        {/* Report / analysis records */}
+        {(record.record_type === 'report' || record.record_type === 'analysis') ? (
           <>
             <Text style={styles.sectionTitle}>摘要</Text>
             <Text style={styles.summaryText}>{record.summary}</Text>
@@ -153,6 +210,22 @@ export default function RecordDetailScreen() {
           </View>
         )}
 
+        {/* Continue asking button for ask records with session */}
+        {record.record_type === 'ask' && record.session_id && (
+          <Pressable
+            style={styles.continueButton}
+            onPress={() =>
+              tabNavigation.navigate('问股', {
+                sessionId: record.session_id,
+                initialMessages: record.messages ?? [],
+              })
+            }
+          >
+            <Text style={styles.continueButtonText}>继续追问</Text>
+          </Pressable>
+        )}
+
+        {/* View full report button */}
         {record.report_id != null && (
           <Pressable
             style={styles.primaryButton}
@@ -160,11 +233,11 @@ export default function RecordDetailScreen() {
               navigation.navigate('ReportDetail', { reportId: record.report_id! })
             }
           >
-            <Text style={styles.primaryButtonText}>查看报告</Text>
+            <Text style={styles.primaryButtonText}>查看完整报告</Text>
           </Pressable>
         )}
 
-        <Text style={styles.dateText}>{record.created_at}</Text>
+        <Text style={styles.dateText}>{displayTime}</Text>
       </View>
     </ScrollView>
   );
@@ -182,10 +255,12 @@ const styles = StyleSheet.create({
     padding: 24,
     marginTop: 24,
   },
+  typeBadge: {
+    marginBottom: 4,
+  },
   typeLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2563eb',
     marginBottom: 4,
   },
   stockName: {
@@ -276,6 +351,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  continueButton: {
+    backgroundColor: '#e0f2fe',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  continueButtonText: {
+    color: '#0369a1',
+    fontSize: 16,
+    fontWeight: '700',
+  },
   dateText: {
     fontSize: 13,
     color: '#94a3b8',
@@ -293,5 +380,30 @@ const styles = StyleSheet.create({
     color: '#dc2626',
     textAlign: 'center',
     marginTop: 100,
+  },
+  loginTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0f172a',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  loginDescription: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  loginButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignSelf: 'center',
+  },
+  loginButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

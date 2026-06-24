@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_current_user_id, get_connection
 
@@ -14,10 +14,10 @@ def get_records(user_id: str = Depends(get_current_user_id)):
             """
             SELECT id, record_type, stock_code, stock_name, title, summary,
                    question, answer_type, report_id, metadata_json, created_at,
-                   session_id
+                   updated_at, session_id
             FROM records
             WHERE user_id = ?
-            ORDER BY id DESC
+            ORDER BY updated_at DESC, id DESC
             """,
             (user_id,),
         ).fetchall()
@@ -38,6 +38,7 @@ def get_records(user_id: str = Depends(get_current_user_id)):
             "report_id": row["report_id"],
             "metadata": metadata,
             "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
             "session_id": row["session_id"],
         })
 
@@ -51,7 +52,7 @@ def get_record(record_id: int, user_id: str = Depends(get_current_user_id)):
             """
             SELECT id, record_type, stock_code, stock_name, title, summary,
                    question, answer, answer_type, report_id, metadata_json, created_at,
-                   session_id
+                   updated_at, session_id
             FROM records
             WHERE id = ? AND user_id = ?
             """,
@@ -59,10 +60,10 @@ def get_record(record_id: int, user_id: str = Depends(get_current_user_id)):
         ).fetchone()
 
     if row is None:
-        return {
-            "message": "record not found",
-            "record_id": record_id,
-        }
+        raise HTTPException(
+            status_code=404,
+            detail={"error_code": "RECORD_NOT_FOUND", "message": "记录不存在"},
+        )
 
     metadata = json.loads(row["metadata_json"]) if row["metadata_json"] else {}
 
@@ -79,6 +80,7 @@ def get_record(record_id: int, user_id: str = Depends(get_current_user_id)):
         "report_id": row["report_id"],
         "metadata": metadata,
         "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
         "session_id": row["session_id"],
         "messages": None,
     }

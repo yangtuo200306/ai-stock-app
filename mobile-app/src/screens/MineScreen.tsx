@@ -5,8 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 import type { MineStackParamList } from '../types';
-
-const BACKEND_URL_STORAGE_KEY = 'backendUrl';
+import { STORAGE_KEYS } from '../api/client';
 
 type NavProp = NativeStackNavigationProp<MineStackParamList, 'Mine'>;
 
@@ -19,7 +18,7 @@ export default function MineScreen() {
 
   useEffect(() => {
     const loadSavedBackendUrl = async () => {
-      const storedBackendUrl = await AsyncStorage.getItem(BACKEND_URL_STORAGE_KEY);
+      const storedBackendUrl = await AsyncStorage.getItem(STORAGE_KEYS.BACKEND_URL);
 
       if (storedBackendUrl) {
         setBackendUrl(storedBackendUrl);
@@ -37,7 +36,7 @@ export default function MineScreen() {
       return;
     }
 
-    await AsyncStorage.setItem(BACKEND_URL_STORAGE_KEY, backendUrl);
+    await AsyncStorage.setItem(STORAGE_KEYS.BACKEND_URL, backendUrl);
     setSavedBackendUrl(backendUrl);
     setMessage('地址已保存');
   };

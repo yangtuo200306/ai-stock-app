@@ -9,13 +9,18 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { apiGet } from '../api/client';
-import type { RecordItem, RecordStackParamList } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import type { RecordItem, RecordStackParamList, RootTabParamList } from '../types';
 
 type NavigationType = NativeStackNavigationProp<RecordStackParamList, 'RecordList'>;
+type TabNavProp = BottomTabNavigationProp<RootTabParamList>;
 
 export default function RecordListScreen() {
   const navigation = useNavigation<NavigationType>();
+  const tabNavigation = useNavigation<TabNavProp>();
+  const { isLoggedIn, isLoading: authLoading } = useAuth();
   const [items, setItems] = useState<RecordItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,8 +32,8 @@ export default function RecordListScreen() {
     try {
       const data = await apiGet('/api/records');
       setItems(data.items ?? []);
-    } catch {
-      setError('加载记录失败，请检查后端服务是否启动');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '加载记录失败，请检查后端服务是否启动');
     } finally {
       setLoading(false);
     }
@@ -44,6 +49,8 @@ export default function RecordListScreen() {
         return '问股';
       case 'analysis':
         return '分析';
+      case 'report':
+        return '报告';
       default:
         return recordType;
     }
@@ -54,11 +61,33 @@ export default function RecordListScreen() {
       case 'ask':
         return '#2563eb';
       case 'analysis':
+        return '#64748b';
+      case 'report':
         return '#7c3aed';
       default:
         return '#64748b';
     }
   };
+
+  if (authLoading) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loadingText}>加载中...</Text>
+      </View>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loginTitle}>请先登录</Text>
+        <Text style={styles.loginDescription}>登录后可以使用自选、问股和记录功能。</Text>
+        <Pressable style={styles.loginButton} onPress={() => tabNavigation.navigate('我的', { screen: 'Login' })}>
+          <Text style={styles.loginButtonText}>去登录</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (loading) {
     return (
@@ -119,7 +148,7 @@ export default function RecordListScreen() {
               <View style={[styles.typeBadge, { backgroundColor: getTypeColor(item.record_type) }]}>
                 <Text style={styles.typeBadgeText}>{getTypeLabel(item.record_type)}</Text>
               </View>
-              <Text style={styles.dateText}>{item.created_at}</Text>
+              <Text style={styles.dateText}>{item.updated_at || item.created_at}</Text>
             </View>
             <Text style={styles.stockName}>
               {item.stock_name}（{item.stock_code}）
@@ -258,6 +287,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  loginTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0f172a',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  loginDescription: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  loginButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  loginButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',

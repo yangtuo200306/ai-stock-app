@@ -1,19 +1,26 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { ScrollView, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { apiGet } from '../api/client';
-import type { Report } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import type { Report, RootTabParamList } from '../types';
 
 type RouteType = RouteProp<{ ReportDetail: { reportId: number } }, 'ReportDetail'>;
+type TabNavProp = BottomTabNavigationProp<RootTabParamList>;
 
 export default function ReportDetailScreen() {
   const route = useRoute<RouteType>();
+  const tabNavigation = useNavigation<TabNavProp>();
+  const { isLoggedIn, isLoading: authLoading } = useAuth();
   const { reportId } = route.params;
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (authLoading || !isLoggedIn) return;
+
     const fetchReport = async () => {
       try {
         const data = await apiGet(`/api/reports/${reportId}`);
@@ -22,13 +29,33 @@ export default function ReportDetailScreen() {
         } else {
           setError('报告不存在');
         }
-      } catch {
-        setError('获取报告失败');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : '获取报告失败');
       }
     };
 
     fetchReport();
-  }, [reportId]);
+  }, [authLoading, isLoggedIn, reportId]);
+
+  if (authLoading) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loadingText}>加载中...</Text>
+      </View>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loginTitle}>请先登录</Text>
+        <Text style={styles.loginDescription}>登录后可以使用自选、问股和记录功能。</Text>
+        <Pressable style={styles.loginButton} onPress={() => tabNavigation.navigate('我的', { screen: 'Login' })}>
+          <Text style={styles.loginButtonText}>去登录</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (error) {
     return (
@@ -220,6 +247,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     padding: 24,
   },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
@@ -296,5 +329,29 @@ const styles = StyleSheet.create({
     color: '#dc2626',
     textAlign: 'center',
     marginTop: 100,
+  },
+  loginTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0f172a',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  loginDescription: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  loginButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  loginButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

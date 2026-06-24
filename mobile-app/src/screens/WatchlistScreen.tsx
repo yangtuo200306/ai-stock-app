@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../contexts/AuthContext';
 import {
   Alert,
   FlatList,
@@ -11,13 +12,14 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation as useTabNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { apiGet, apiPost, apiDelete } from '../api/client';
-import type { Stock, WatchlistStackParamList } from '../types';
+import type { Stock, WatchlistStackParamList, RootTabParamList } from '../types';
 
 const TASK_IDS_KEY = 'stockTaskIds';
 
 type NavProp = NativeStackNavigationProp<WatchlistStackParamList, 'Watchlist'>;
+type TabNavProp = BottomTabNavigationProp<RootTabParamList>;
 
 function normalizeAShareCode(code: string) {
   let normalized = code.trim().toUpperCase();
@@ -41,7 +43,8 @@ function normalizeAShareCode(code: string) {
 
 export default function WatchlistScreen() {
   const navigation = useNavigation<NavProp>();
-  const tabNavigation = useTabNavigation<any>();
+  const tabNavigation = useNavigation<TabNavProp>();
+  const { isLoggedIn, isLoading: authLoading } = useAuth();
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -137,8 +140,8 @@ export default function WatchlistScreen() {
           });
           await loadStocks();
         }
-      } catch {
-        Alert.alert('错误', '删除自选股失败');
+      } catch (err: unknown) {
+        Alert.alert('错误', err instanceof Error ? err.message : '删除自选股失败');
       }
     },
     [loadStocks],
@@ -163,8 +166,8 @@ export default function WatchlistScreen() {
         } else {
           Alert.alert('错误', '创建分析任务失败');
         }
-      } catch {
-        Alert.alert('错误', '创建分析任务失败，请检查后端服务');
+      } catch (err: unknown) {
+        Alert.alert('错误', err instanceof Error ? err.message : '创建分析任务失败，请检查后端服务');
       }
     },
     [navigation],
@@ -207,36 +210,87 @@ export default function WatchlistScreen() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loadingText}>加载中...</Text>
+      </View>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loginTitle}>请先登录</Text>
+        <Text style={styles.loginDescription}>登录后可以使用自选、问股和记录功能。</Text>
+        <Pressable style={styles.loginButton} onPress={() => tabNavigation.navigate('我的', { screen: 'Login' })}>
+          <Text style={styles.loginButtonText}>去登录</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   const renderStockItem = ({ item }: { item: Stock }) => {
     const status = taskStatuses[item.code];
+    const typeLabel =
+      item.latest_record_type === 'technical'
+        ? '技术分析'
+        : item.latest_record_type === 'fundamental'
+          ? '基本面分析'
+          : item.latest_record_type === 'news'
+            ? '新闻分析'
+            : item.latest_record_type === 'comprehensive'
+              ? '综合分析'
+              : item.latest_record_type || '';
     return (
       <Pressable
         style={styles.stockItem}
         onPress={() => handleCreateAnalysis(item)}
         onLongPress={() => handleDeleteStock(item.code)}
       >
-        <View style={styles.stockInfo}>
-          <Text style={styles.stockCode}>{item.code}</Text>
-          <Text style={styles.stockName}>{item.name}</Text>
+        <View style={styles.stockTopRow}>
+          <View style={styles.stockInfo}>
+            <Text style={styles.stockCode}>{item.code}</Text>
+            <Text style={styles.stockName}>{item.name}</Text>
+          </View>
+          <View style={styles.stockActions}>
+            {status ? (
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(status) }]}>
+                <Text style={styles.statusText}>{getStatusLabel(status)}</Text>
+              </View>
+            ) : null}
+            <Pressable
+              style={styles.askButton}
+              onPress={() => handleAskAI(item)}
+            >
+              <Text style={styles.askButtonText}>问 AI</Text>
+            </Pressable>
+            <Pressable
+              style={styles.deleteButton}
+              onPress={() => handleDeleteStock(item.code)}
+            >
+              <Text style={styles.deleteButtonText}>删除</Text>
+            </Pressable>
+          </View>
         </View>
-        <View style={styles.stockActions}>
-          {status ? (
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(status) }]}>
-              <Text style={styles.statusText}>{getStatusLabel(status)}</Text>
-            </View>
-          ) : null}
-          <Pressable
-            style={styles.askButton}
-            onPress={() => handleAskAI(item)}
-          >
-            <Text style={styles.askButtonText}>问 AI</Text>
-          </Pressable>
-          <Pressable
-            style={styles.deleteButton}
-            onPress={() => handleDeleteStock(item.code)}
-          >
-            <Text style={styles.deleteButtonText}>删除</Text>
-          </Pressable>
+        <View style={styles.summarySection}>
+          {item.latest_summary ? (
+            <>
+              <Text style={styles.summaryText} numberOfLines={2}>
+                {item.latest_summary}
+              </Text>
+              <View style={styles.summaryMeta}>
+                {typeLabel ? (
+                  <Text style={styles.summaryTypeLabel}>{typeLabel}</Text>
+                ) : null}
+                {item.latest_updated_at ? (
+                  <Text style={styles.summaryTime}>{item.latest_updated_at}</Text>
+                ) : null}
+              </View>
+            </>
+          ) : (
+            <Text style={styles.noSummaryText}>暂无分析记录</Text>
+          )}
         </View>
       </Pressable>
     );
@@ -295,6 +349,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    padding: 24,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
@@ -362,14 +422,16 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   stockItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
     backgroundColor: '#f8fafc',
     borderRadius: 8,
     marginBottom: 8,
+  },
+  stockTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   stockInfo: {
     flex: 1,
@@ -388,6 +450,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  summarySection: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e2e8f0',
+  },
+  summaryText: {
+    fontSize: 13,
+    color: '#334155',
+    lineHeight: 18,
+  },
+  summaryMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 8,
+  },
+  summaryTypeLabel: {
+    fontSize: 11,
+    color: '#6366f1',
+    backgroundColor: '#eef2ff',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  summaryTime: {
+    fontSize: 11,
+    color: '#94a3b8',
+  },
+  noSummaryText: {
+    fontSize: 13,
+    color: '#94a3b8',
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -432,5 +528,29 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textAlign: 'center',
     marginTop: 12,
+  },
+  loginTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0f172a',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  loginDescription: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  loginButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  loginButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

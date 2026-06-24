@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -8,15 +8,18 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { apiPost } from '../api/client';
-import type { AskMessage, AskResponse } from '../types';
+import type { AskMessage, AskResponse, RootTabParamList } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
-type AskRouteProp = RouteProp<{ 问股: { initialQuestion?: string } }, '问股'>;
+type AskRouteProp = RouteProp<RootTabParamList, '问股'>;
 
 export default function AskScreen() {
   const route = useRoute<AskRouteProp>();
+  const navigation = useNavigation<any>();
+  const { isLoggedIn, isLoading: authLoading } = useAuth();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AskMessage[]>([]);
   const [question, setQuestion] = useState('');
@@ -25,12 +28,33 @@ export default function AskScreen() {
   const [latestResult, setLatestResult] = useState<AskResponse | null>(null);
   const [addToWatchlistLoading, setAddToWatchlistLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const initialParamsHandled = useRef(false);
 
   useEffect(() => {
-    if (route.params?.initialQuestion) {
-      setQuestion(route.params.initialQuestion);
+    if (initialParamsHandled.current) return;
+    const params = route.params;
+    if (!params) return;
+
+    if (params.initialQuestion) {
+      setQuestion(params.initialQuestion);
     }
-  }, [route.params?.initialQuestion]);
+    if (params.sessionId) {
+      setSessionId(params.sessionId);
+    }
+    if (params.initialMessages && params.initialMessages.length > 0) {
+      setMessages(params.initialMessages);
+    }
+    initialParamsHandled.current = true;
+  }, [route.params]);
+
+  const handleNewSession = useCallback(() => {
+    setSessionId(null);
+    setMessages([]);
+    setLatestResult(null);
+    setQuestion('');
+    setError('');
+    initialParamsHandled.current = false;
+  }, []);
 
   const handleAsk = async () => {
     if (!question.trim()) {
@@ -72,10 +96,10 @@ export default function AskScreen() {
         setSessionId(result.session_id ?? null);
         setQuestion('');
       } else {
-        setError(data.detail || '问股失败，请稍后重试');
+        setError(data.message || data.detail || '问股失败，请稍后重试');
       }
-    } catch {
-      setError('问股失败，请检查后端地址或服务是否启动');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '问股失败，请检查后端地址或服务是否启动');
     } finally {
       setLoading(false);
     }
@@ -91,13 +115,13 @@ export default function AskScreen() {
         name: latestResult.stock_name,
       });
 
-      if (data.message === 'stock added') {
+      if (data.message === 'stock added' || data.message === 'stock already exists') {
         Alert.alert('提示', '已加入自选');
       } else {
-        Alert.alert('提示', '已加入自选');
+        Alert.alert('提示', '加入自选失败，请稍后重试');
       }
     } catch {
-      Alert.alert('提示', '已加入自选');
+      Alert.alert('提示', '加入自选失败，请检查后端服务');
     } finally {
       setAddToWatchlistLoading(false);
     }
@@ -111,11 +135,38 @@ export default function AskScreen() {
         : '#475569'
     : '#475569';
 
+  if (authLoading) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loadingText}>加载中...</Text>
+      </View>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loginTitle}>请先登录</Text>
+        <Text style={styles.loginDescription}>登录后可以使用自选、问股和记录功能。</Text>
+        <Pressable style={styles.loginButton} onPress={() => navigation.navigate('我的', { screen: 'Login' })}>
+          <Text style={styles.loginButtonText}>去登录</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.scrollContainer} ref={scrollRef}>
       <View style={styles.container}>
         <View style={styles.card}>
-          <Text style={styles.title}>问股</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>问股</Text>
+            {(sessionId || messages.length > 0) && (
+              <Pressable style={styles.newSessionButton} onPress={handleNewSession}>
+                <Text style={styles.newSessionButtonText}>新建会话</Text>
+              </Pressable>
+            )}
+          </View>
           <Text style={styles.description}>输入股票问题，查看 AI 分析</Text>
 
           <TextInput
@@ -234,18 +285,33 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: '#0f172a',
-    marginBottom: 12,
-    textAlign: 'center',
   },
   description: {
     fontSize: 16,
     color: '#64748b',
     textAlign: 'center',
     marginBottom: 20,
+  },
+  newSessionButton: {
+    backgroundColor: '#e0f2fe',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  newSessionButtonText: {
+    color: '#0369a1',
+    fontSize: 14,
+    fontWeight: '600',
   },
   input: {
     borderWidth: 1,
@@ -357,6 +423,40 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#0369a1',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  centerContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#475569',
+  },
+  loginTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 8,
+  },
+  loginDescription: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  loginButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  loginButtonText: {
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
   },

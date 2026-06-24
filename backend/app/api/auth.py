@@ -51,7 +51,7 @@ def register(body: RegisterCreate):
         if existing:
             raise HTTPException(
                 status_code=400,
-                detail={"message": "username already exists", "error": "username_exists"},
+                detail={"error_code": "USERNAME_EXISTS", "message": "用户名已存在"},
             )
 
         password_hash, password_salt = _hash_password(body.password)
@@ -86,13 +86,13 @@ def login(body: LoginCreate):
         if row is None:
             raise HTTPException(
                 status_code=401,
-                detail={"message": "invalid username or password", "error": "invalid_credentials"},
+                detail={"error_code": "INVALID_CREDENTIALS", "message": "用户名或密码错误"},
             )
 
         if not _verify_password(body.password, row["password_hash"], row["password_salt"]):
             raise HTTPException(
                 status_code=401,
-                detail={"message": "invalid username or password", "error": "invalid_credentials"},
+                detail={"error_code": "INVALID_CREDENTIALS", "message": "用户名或密码错误"},
             )
 
         token = str(uuid4())
@@ -133,7 +133,7 @@ def get_me(user_id: str = Depends(get_current_user_id)):
         ).fetchone()
 
     if row is None:
-        raise HTTPException(status_code=404, detail="user not found")
+        raise HTTPException(status_code=404, detail={"error_code": "USER_NOT_FOUND", "message": "用户不存在"})
 
     return {
         "user_id": row["id"],

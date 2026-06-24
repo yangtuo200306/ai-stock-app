@@ -1,6 +1,12 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
 export interface Stock {
   code: string;
   name: string;
+  latest_record_id?: number | null;
+  latest_record_type?: string | null;
+  latest_summary?: string | null;
+  latest_updated_at?: string | null;
 }
 
 export interface AnalysisTask {
@@ -110,6 +116,7 @@ export interface RecordItem {
     task_id?: string;
   };
   created_at: string;
+  updated_at?: string;
   session_id?: string | null;
 }
 
@@ -134,15 +141,22 @@ export interface RecordDetail {
     task_id?: string;
   };
   created_at: string;
+  updated_at?: string;
   session_id?: string | null;
   messages?: AskMessage[] | null;
 }
 
 export type RootTabParamList = {
   自选: undefined;
-  问股: { initialQuestion?: string } | undefined;
+  问股:
+    | {
+        sessionId?: string;
+        initialQuestion?: string;
+        initialMessages?: AskMessage[];
+      }
+    | undefined;
   记录: undefined;
-  我的: undefined;
+  我的: NavigatorScreenParams<MineStackParamList> | undefined;
 };
 
 export type WatchlistStackParamList = {
