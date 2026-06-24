@@ -100,14 +100,17 @@ d:/ai-stock-analysis/stock-analysis-reference
 - v0.1 AI Stock App MVP 已完成并通过手动验收。
 - v0.1 总结文档已生成：`docs/releases/v0.1-summary.md`。
 - v0.2 计划文档已生成：`docs/plans/v0.2-plan.md`。
-- v0.2 阶段 1：MA 指标和动态报告已完成并通过审查。
-- v0.2 阶段 2：历史报告列表增强已完成并通过审查。
-- v0.2 阶段 3：fallback 最小版已完成并通过审查。
-- v0.2 阶段 4：问股最小版已完成并通过审查。
-- v0.2 阶段 5：我的页基础整理已完成并通过审查。
-- 阶段 4 和阶段 5 修改已提交，最新提交：`bab6aa0 feat: add v0.2 ask and mine flows`。
-- 当前准备进入：v0.2 整体审查。
-- v0.2 后续方向：真实备用数据源接入、MACD / RSI、AI 总结报告等。
+- v0.2 基础分析增强版已完成并通过整体审查。
+- v0.2 总结文档已生成：`docs/releases/v0.2-summary.md`。
+- v0.2 功能提交：`bab6aa0 feat: add v0.2 ask and mine flows`。
+- v0.2 文档总结提交：`c339b96 docs: summarize v0.2 completion`。
+- v0.2 已推送远程。
+- v0.3 计划文档已生成：`docs/plans/v0.3-plan.md`。
+- v0.3 阶段 1 已完成：`efinance` 主源失败后可尝试新浪实时行情和历史 K 线 fallback。
+- v0.3 阶段 2 已完成：问股支持股票问题输入、火山方舟 DeepSeek Endpoint AI 回答和规则回退。
+- v0.3 Web 手动验收已通过。
+- 当前准备进入：v0.3 阶段 3：整体整理、文档同步和提交。
+- v0.3 总体方向：AI 问股可用版，先提升行情稳定性，再接入已有大模型。
 
 当前后端结构：
 
@@ -129,6 +132,7 @@ backend/
       market_data.py
       technical_indicators.py
       report_builder.py
+      llm_client.py
 ```
 
 当前移动端结构：

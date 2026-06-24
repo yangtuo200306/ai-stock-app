@@ -2,11 +2,27 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 
 import efinance as ef
+import requests
 
 
 QUOTE_CACHE_TTL_SECONDS = 60
 PRIMARY_MARKET_SOURCE = "efinance"
+FALLBACK_MARKET_SOURCE = "sina"
 _quote_cache: dict[str, tuple["StockQuote", datetime]] = {}
+
+SINA_QUOTE_URL = "https://hq.sinajs.cn/list={symbol}"
+SINA_HISTORY_URL = (
+    "https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/"
+    "CN_MarketData.getKLineData?symbol={symbol}&scale=240&ma=no&datalen={datalen}"
+)
+SINA_HEADERS = {
+    "Referer": "https://finance.sina.com.cn",
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+}
 
 
 class MarketDataError(Exception):
@@ -91,6 +107,16 @@ def _to_float(value) -> float:
         raise MarketFieldFormatError("行情字段格式异常") from error
 
 
+def _to_sina_symbol(stock_code: str) -> str:
+    if stock_code.startswith("6"):
+        return f"sh{stock_code}"
+    if stock_code.startswith(("0", "3")):
+        return f"sz{stock_code}"
+    raise InvalidStockCodeError(
+        f"备用行情源 {FALLBACK_MARKET_SOURCE} 暂不支持该股票代码前缀"
+    )
+
+
 def _get_stock_quote_from_efinance(
     stock_code: str, fetched_at: datetime
 ) -> StockQuote:
@@ -127,7 +153,65 @@ def _get_stock_quote_from_efinance(
 def _get_stock_quote_from_fallback(
     stock_code: str, fetched_at: datetime
 ) -> StockQuote:
-    raise MarketSourceNetworkError("备用实时行情数据源暂未配置")
+    symbol = _to_sina_symbol(stock_code)
+    url = SINA_QUOTE_URL.format(symbol=symbol)
+
+    try:
+        resp = requests.get(url, headers=SINA_HEADERS, timeout=10)
+        resp.encoding = "gbk"
+        text = resp.text.strip()
+    except Exception as error:
+        raise MarketSourceNetworkError(
+            f"备用行情源 {FALLBACK_MARKET_SOURCE} 网络连接失败，请稍后重试"
+        ) from error
+
+    if not text or '=""' in text:
+        raise StockQuoteNotFoundError(
+            f"备用行情源 {FALLBACK_MARKET_SOURCE} 未找到该股票行情"
+        )
+
+    try:
+        data = text.split('"')[1]
+        fields = data.split(",")
+    except (IndexError, ValueError) as error:
+        raise MarketFieldFormatError(
+            f"备用行情源 {FALLBACK_MARKET_SOURCE} 返回格式异常"
+        ) from error
+
+    if len(fields) < 32:
+        raise MarketFieldFormatError(
+            f"备用行情源 {FALLBACK_MARKET_SOURCE} 返回字段不足"
+        )
+
+    name = fields[0].strip()
+    if not name:
+        raise StockQuoteNotFoundError(
+            f"备用行情源 {FALLBACK_MARKET_SOURCE} 未找到该股票行情"
+        )
+
+    try:
+        yesterday_close = _to_float(fields[2])
+        current_price = _to_float(fields[3])
+    except (MarketFieldEmptyError, MarketFieldFormatError) as error:
+        raise MarketFieldFormatError(
+            f"备用行情源 {FALLBACK_MARKET_SOURCE} 价格字段异常"
+        ) from error
+
+    if yesterday_close == 0:
+        raise MarketFieldFormatError(
+            f"备用行情源 {FALLBACK_MARKET_SOURCE} 昨收价为零，无法计算涨跌幅"
+        )
+
+    change_pct = round((current_price - yesterday_close) / yesterday_close * 100, 2)
+
+    return StockQuote(
+        code=stock_code,
+        name=name,
+        price=current_price,
+        change_pct=change_pct,
+        source=FALLBACK_MARKET_SOURCE,
+        fetched_at=fetched_at.isoformat(timespec="seconds"),
+    )
 
 
 def get_stock_quote(code: str) -> StockQuote:
@@ -140,10 +224,22 @@ def get_stock_quote(code: str) -> StockQuote:
         if now - cached_at <= timedelta(seconds=QUOTE_CACHE_TTL_SECONDS):
             return cached_quote
 
-    quote = _get_stock_quote_from_efinance(stock_code, now)
-    _quote_cache[stock_code] = (quote, now)
+    try:
+        quote = _get_stock_quote_from_efinance(stock_code, now)
+        _quote_cache[stock_code] = (quote, now)
+        return quote
+    except MarketDataError as primary_error:
+        pass
 
-    return quote
+    try:
+        quote = _get_stock_quote_from_fallback(stock_code, now)
+        _quote_cache[stock_code] = (quote, now)
+        return quote
+    except MarketDataError as fallback_error:
+        raise MarketSourceNetworkError(
+            f"行情获取失败：主行情源 efinance 失败（{primary_error}），"
+            f"备用行情源 sina 也失败（{fallback_error}）"
+        ) from fallback_error
 
 
 def _get_stock_history_from_efinance(
@@ -189,9 +285,59 @@ def _get_stock_history_from_efinance(
 def _get_stock_history_from_fallback(
     stock_code: str, days: int
 ) -> list[StockDailyPrice]:
-    raise MarketSourceNetworkError("备用历史行情数据源暂未配置")
+    symbol = _to_sina_symbol(stock_code)
+    url = SINA_HISTORY_URL.format(symbol=symbol, datalen=days)
+
+    try:
+        resp = requests.get(url, headers=SINA_HEADERS, timeout=10)
+        data = resp.json()
+    except Exception as error:
+        raise MarketSourceNetworkError(
+            f"备用行情源 {FALLBACK_MARKET_SOURCE} 历史行情网络连接失败，请稍后重试"
+        ) from error
+
+    if not data or not isinstance(data, list):
+        raise MarketSourceEmptyError(
+            f"备用行情源 {FALLBACK_MARKET_SOURCE} 未返回历史行情数据"
+        )
+
+    history: list[StockDailyPrice] = []
+    for item in data:
+        try:
+            price = StockDailyPrice(
+                date=str(item.get("day", "")),
+                open=_to_float(item.get("open")),
+                close=_to_float(item.get("close")),
+                high=_to_float(item.get("high")),
+                low=_to_float(item.get("low")),
+                volume=_to_float(item.get("volume")),
+            )
+            history.append(price)
+        except (MarketFieldEmptyError, MarketFieldFormatError):
+            continue
+
+    recent_history = history[-days:]
+    if len(recent_history) < 20:
+        raise MarketSourceEmptyError(
+            f"备用行情源 {FALLBACK_MARKET_SOURCE} 历史行情数据不足"
+            f"（当前 {len(recent_history)} 条，至少需要 20 条）"
+        )
+
+    return recent_history
 
 
 def get_stock_history(code: str, days: int = 30) -> list[StockDailyPrice]:
     stock_code = normalize_a_share_code(code)
-    return _get_stock_history_from_efinance(stock_code, days)
+
+    try:
+        return _get_stock_history_from_efinance(stock_code, days)
+    except MarketDataError as primary_error:
+        pass
+
+    try:
+        return _get_stock_history_from_fallback(stock_code, days)
+    except MarketDataError as fallback_error:
+        raise MarketSourceNetworkError(
+            f"历史行情获取失败：主行情源 efinance 失败（{primary_error}），"
+            f"备用行情源 sina 也失败（{fallback_error}）"
+        ) from fallback_error

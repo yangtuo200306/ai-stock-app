@@ -443,15 +443,19 @@ ai-stock-app/docs/releases/v0.1-summary.md
 
 1. v0.1 AI Stock App MVP 已完成并通过手动验收。
 2. v0.1 总结文档已生成：`docs/releases/v0.1-summary.md`。
-3. v0.2 阶段 1 已完成并通过审查：MA 指标和动态报告。
-4. v0.2 阶段 2 已完成并通过审查：历史报告列表增强。
-5. v0.2 阶段 3 已完成并通过审查：fallback 最小版。
-6. v0.2 阶段 4 已完成并通过审查：问股最小版。
-7. v0.2 阶段 5 已完成并通过审查：我的页基础整理。
-8. 阶段 4 和阶段 5 修改已提交，最新提交：`bab6aa0 feat: add v0.2 ask and mine flows`。
+3. v0.2 基础分析增强版已完成并通过整体审查。
+4. v0.2 总结文档已生成：`docs/releases/v0.2-summary.md`。
+5. v0.2 功能提交：`bab6aa0 feat: add v0.2 ask and mine flows`。
+6. v0.2 文档总结提交：`c339b96 docs: summarize v0.2 completion`。
+7. v0.2 已推送远程。
+8. v0.3 计划文档已生成：`docs/plans/v0.3-plan.md`。
+9. v0.3 阶段 1 已完成：`efinance` 主源失败后可尝试新浪实时行情和历史 K 线 fallback，并返回聚合错误。
+10. v0.3 阶段 2 已完成：问股支持股票问题输入、6 位股票代码提取、火山方舟 DeepSeek Endpoint AI 回答和规则回退。
+11. v0.3 Web 手动验收已通过：问股页可展示 AI 回答、行情摘要、技术指标和风险提示。
+12. v0.3 已知问题已记录到 `docs/code-review-notes.md`，包括新浪非官方接口、火山 Endpoint ID、`llm_error` 调试字段和 UI/UX 模板化问题。
 
 建议下一步：
 
-1. 重新进行 v0.2 整体审查，确认版本范围、代码、文档和 Git 状态一致。
-2. 审查通过后，推送最新提交到远程仓库。
-3. 准备 v0.2 总结，并讨论 v0.3 方向。
+1. 完成 v0.3 文档总结和最终提交。
+2. 提交前确认 `.env` 未被 Git 跟踪，避免泄露 API Key。
+3. v0.3 之后建议单独规划 UI/UX 优化阶段，集中改造问股页、报告详情页、历史报告页和自选页。

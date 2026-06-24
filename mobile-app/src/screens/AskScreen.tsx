@@ -8,7 +8,7 @@ const BACKEND_URL_STORAGE_KEY = 'backendUrl';
 
 export default function AskScreen() {
   const [backendUrl, setBackendUrl] = useState('');
-  const [stockCode, setStockCode] = useState('');
+  const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<AskResponse | null>(null);
@@ -26,12 +26,12 @@ export default function AskScreen() {
 
   const handleAsk = async () => {
     if (!backendUrl) {
-      setError('请先到“我的”页面设置后端地址');
+      setError('请先到"我的"页面设置后端地址');
       return;
     }
 
-    if (!stockCode.trim()) {
-      setError('请先输入股票代码');
+    if (!question.trim()) {
+      setError('请先输入股票问题');
       return;
     }
 
@@ -45,7 +45,7 @@ export default function AskScreen() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ stock_code: stockCode.trim() }),
+        body: JSON.stringify({ question: question.trim() }),
       });
       const data = await response.json();
 
@@ -74,15 +74,14 @@ export default function AskScreen() {
     <View style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>问股</Text>
-        <Text style={styles.description}>输入 A 股代码，查看基础分析</Text>
+        <Text style={styles.description}>输入股票问题，查看 AI 分析</Text>
 
         <TextInput
           style={styles.input}
-          value={stockCode}
-          onChangeText={setStockCode}
-          placeholder="例如：600519"
+          value={question}
+          onChangeText={setQuestion}
+          placeholder="例如：600519 怎么看？"
           placeholderTextColor="#94a3b8"
-          autoCapitalize="characters"
         />
 
         <Pressable
@@ -121,7 +120,9 @@ export default function AskScreen() {
               <Text style={styles.value}>{result.score}</Text>
             </View>
 
-            <Text style={styles.sectionTitle}>基础回答</Text>
+            <Text style={styles.sectionTitle}>
+              {result.answer_type === 'ai' ? 'AI 回答' : '规则回退回答'}
+            </Text>
             <Text style={styles.answer}>{result.answer}</Text>
 
             <Text style={styles.sectionTitle}>技术指标</Text>

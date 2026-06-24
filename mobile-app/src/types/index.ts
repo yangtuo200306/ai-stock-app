@@ -63,9 +63,13 @@ export interface AskResponse {
   trend: string;
   action: string;
   score: number;
+  question?: string;
   answer: string;
+  answer_type?: string;
   risks: string[];
   indicators: ReportIndicators;
+  model?: string;
+  llm_error?: string;
 }
 
 export type RootTabParamList = {

@@ -1,3 +1,5 @@
 fastapi
 uvicorn
 efinance
+requests
+python-dotenv
