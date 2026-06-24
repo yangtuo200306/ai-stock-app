@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
+import { apiGet } from '../api/client';
 import type { Report } from '../types';
-
-const BACKEND_URL_STORAGE_KEY = 'backendUrl';
 
 type RouteType = RouteProp<{ ReportDetail: { reportId: number } }, 'ReportDetail'>;
 
@@ -17,15 +15,8 @@ export default function ReportDetailScreen() {
 
   useEffect(() => {
     const fetchReport = async () => {
-      const backendUrl = await AsyncStorage.getItem(BACKEND_URL_STORAGE_KEY);
-      if (!backendUrl) {
-        setError('后端地址未配置');
-        return;
-      }
-
       try {
-        const res = await fetch(`${backendUrl}/api/reports/${reportId}`);
-        const data = await res.json();
+        const data = await apiGet(`/api/reports/${reportId}`);
         if (data.id) {
           setReport(data as Report);
         } else {

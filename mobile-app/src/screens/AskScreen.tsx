@@ -1,35 +1,35 @@
 import { useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
+import { apiPost } from '../api/client';
 import type { AskResponse } from '../types';
 
-const BACKEND_URL_STORAGE_KEY = 'backendUrl';
+type AskRouteProp = RouteProp<{ 问股: { initialQuestion?: string } }, '问股'>;
 
 export default function AskScreen() {
-  const [backendUrl, setBackendUrl] = useState('');
+  const route = useRoute<AskRouteProp>();
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<AskResponse | null>(null);
+  const [addToWatchlistLoading, setAddToWatchlistLoading] = useState(false);
 
   useEffect(() => {
-    const loadBackendUrl = async () => {
-      const storedBackendUrl = await AsyncStorage.getItem(BACKEND_URL_STORAGE_KEY);
-      if (storedBackendUrl) {
-        setBackendUrl(storedBackendUrl);
-      }
-    };
-
-    loadBackendUrl();
-  }, []);
+    if (route.params?.initialQuestion) {
+      setQuestion(route.params.initialQuestion);
+    }
+  }, [route.params?.initialQuestion]);
 
   const handleAsk = async () => {
-    if (!backendUrl) {
-      setError('请先到"我的"页面设置后端地址');
-      return;
-    }
-
     if (!question.trim()) {
       setError('请先输入股票问题');
       return;
@@ -40,25 +40,39 @@ export default function AskScreen() {
     setResult(null);
 
     try {
-      const response = await fetch(`${backendUrl}/api/ask`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ question: question.trim() }),
-      });
-      const data = await response.json();
+      const data = await apiPost('/api/ask', { question: question.trim() });
 
-      if (!response.ok) {
+      if (data.stock_code) {
+        setResult(data as AskResponse);
+      } else {
         setError(data.detail || '问股失败，请稍后重试');
-        return;
       }
-
-      setResult(data);
     } catch {
       setError('问股失败，请检查后端地址或服务是否启动');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddToWatchlist = async () => {
+    if (!result) return;
+
+    setAddToWatchlistLoading(true);
+    try {
+      const data = await apiPost('/api/stocks', {
+        code: result.stock_code,
+        name: result.stock_name,
+      });
+
+      if (data.message === 'stock added') {
+        Alert.alert('提示', '已加入自选');
+      } else {
+        Alert.alert('提示', '已加入自选');
+      }
+    } catch {
+      Alert.alert('提示', '已加入自选');
+    } finally {
+      setAddToWatchlistLoading(false);
     }
   };
 
@@ -71,85 +85,98 @@ export default function AskScreen() {
     : '#475569';
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>问股</Text>
-        <Text style={styles.description}>输入股票问题，查看 AI 分析</Text>
+    <ScrollView style={styles.scrollContainer}>
+      <View style={styles.container}>
+        <View style={styles.card}>
+          <Text style={styles.title}>问股</Text>
+          <Text style={styles.description}>输入股票问题，查看 AI 分析</Text>
 
-        <TextInput
-          style={styles.input}
-          value={question}
-          onChangeText={setQuestion}
-          placeholder="例如：600519 怎么看？"
-          placeholderTextColor="#94a3b8"
-        />
+          <TextInput
+            style={styles.input}
+            value={question}
+            onChangeText={setQuestion}
+            placeholder="例如：600519 怎么看？"
+            placeholderTextColor="#94a3b8"
+          />
 
-        <Pressable
-          style={[styles.primaryButton, loading && styles.disabledButton]}
-          onPress={handleAsk}
-          disabled={loading}
-        >
-          <Text style={styles.primaryButtonText}>{loading ? '分析中...' : '开始问股'}</Text>
-        </Pressable>
+          <Pressable
+            style={[styles.primaryButton, loading && styles.disabledButton]}
+            onPress={handleAsk}
+            disabled={loading}
+          >
+            <Text style={styles.primaryButtonText}>{loading ? '分析中...' : '开始问股'}</Text>
+          </Pressable>
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        {result ? (
-          <View style={styles.resultCard}>
-            <Text style={styles.stockName}>
-              {result.stock_name}（{result.stock_code}）
-            </Text>
-            <View style={styles.row}>
-              <Text style={styles.label}>当前价</Text>
-              <Text style={styles.value}>{result.price}</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>涨跌幅</Text>
-              <Text style={[styles.value, { color: changeColor }]}>{result.change_pct}%</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>趋势</Text>
-              <Text style={styles.value}>{result.trend}</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>建议</Text>
-              <Text style={styles.value}>{result.action}</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>评分</Text>
-              <Text style={styles.value}>{result.score}</Text>
-            </View>
-
-            <Text style={styles.sectionTitle}>
-              {result.answer_type === 'ai' ? 'AI 回答' : '规则回退回答'}
-            </Text>
-            <Text style={styles.answer}>{result.answer}</Text>
-
-            <Text style={styles.sectionTitle}>技术指标</Text>
-            <Text style={styles.indicatorText}>
-              MA5：{result.indicators.ma5 ?? '-'} ｜ MA10：{result.indicators.ma10 ?? '-'} ｜ MA20：
-              {result.indicators.ma20 ?? '-'}
-            </Text>
-
-            <Text style={styles.sectionTitle}>风险提示</Text>
-            {result.risks.map((risk) => (
-              <Text key={risk} style={styles.riskText}>
-                • {risk}
+          {result ? (
+            <View style={styles.resultCard}>
+              <Text style={styles.stockName}>
+                {result.stock_name}（{result.stock_code}）
               </Text>
-            ))}
-          </View>
-        ) : null}
+              <View style={styles.row}>
+                <Text style={styles.label}>当前价</Text>
+                <Text style={styles.value}>{result.price}</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.label}>涨跌幅</Text>
+                <Text style={[styles.value, { color: changeColor }]}>{result.change_pct}%</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.label}>趋势</Text>
+                <Text style={styles.value}>{result.trend}</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.label}>建议</Text>
+                <Text style={styles.value}>{result.action}</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.label}>评分</Text>
+                <Text style={styles.value}>{result.score}</Text>
+              </View>
+
+              <Text style={styles.sectionTitle}>
+                {result.answer_type === 'ai' ? 'AI 回答' : '规则回退回答'}
+              </Text>
+              <Text style={styles.answer}>{result.answer}</Text>
+
+              <Text style={styles.sectionTitle}>技术指标</Text>
+              <Text style={styles.indicatorText}>
+                MA5：{result.indicators.ma5 ?? '-'} ｜ MA10：{result.indicators.ma10 ?? '-'} ｜ MA20：
+                {result.indicators.ma20 ?? '-'}
+              </Text>
+
+              <Text style={styles.sectionTitle}>风险提示</Text>
+              {result.risks.map((risk) => (
+                <Text key={risk} style={styles.riskText}>
+                  • {risk}
+                </Text>
+              ))}
+
+              <Pressable
+                style={[styles.secondaryButton, addToWatchlistLoading && styles.disabledButton]}
+                onPress={handleAddToWatchlist}
+                disabled={addToWatchlistLoading}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  {addToWatchlistLoading ? '添加中...' : '加入自选'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scrollContainer: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  container: {
     alignItems: 'center',
-    justifyContent: 'center',
     padding: 24,
   },
   card: {
@@ -248,5 +275,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#475569',
     lineHeight: 22,
+  },
+  secondaryButton: {
+    backgroundColor: '#e0f2fe',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  secondaryButtonText: {
+    color: '#0369a1',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

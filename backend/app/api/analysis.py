@@ -1,10 +1,10 @@
 import json
 from uuid import uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.database import get_connection
+from app.database import get_current_user_id, get_connection
 from app.services.market_data import MarketDataError, get_stock_quote, get_stock_history
 from app.services.technical_indicators import build_technical_indicators
 from app.services.report_builder import build_analysis_report
@@ -16,8 +16,38 @@ class AnalysisCreate(BaseModel):
     stock_code: str
 
 
+def _write_analysis_record(report: dict, task_id: str, user_id: str):
+    metadata = {
+        "price": report["price"],
+        "change_pct": report["indicators"]["change_pct"],
+        "score": report["score"],
+        "action": report["action"],
+        "trend": report["trend"],
+        "task_id": task_id,
+    }
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO records (user_id, record_type, stock_code, stock_name,
+                                 title, summary, report_id, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                "analysis",
+                report["stock_code"],
+                report["stock_name"],
+                f"自选分析：{report['stock_name']}（{report['stock_code']}）",
+                report["summary"],
+                report.get("report_id"),
+                json.dumps(metadata, ensure_ascii=False),
+            ),
+        )
+
+
 @router.post("/analysis")
-def create_analysis_task(analysis: AnalysisCreate):
+def create_analysis_task(analysis: AnalysisCreate, user_id: str = Depends(get_current_user_id)):
     task_id = str(uuid4())
     status = "completed"
     progress = 100
@@ -31,11 +61,11 @@ def create_analysis_task(analysis: AnalysisCreate):
             connection.execute(
                 """
                 INSERT INTO analysis_tasks (
-                    task_id, stock_code, status, progress, message, report_id
+                    task_id, stock_code, status, progress, message, report_id, user_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (task_id, analysis.stock_code, "failed", 0, failed_message, None),
+                (task_id, analysis.stock_code, "failed", 0, failed_message, None, user_id),
             )
 
         return {
@@ -56,11 +86,11 @@ def create_analysis_task(analysis: AnalysisCreate):
             connection.execute(
                 """
                 INSERT INTO analysis_tasks (
-                    task_id, stock_code, status, progress, message, report_id
+                    task_id, stock_code, status, progress, message, report_id, user_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (task_id, analysis.stock_code, "failed", 0, failed_message, None),
+                (task_id, analysis.stock_code, "failed", 0, failed_message, None, user_id),
             )
 
         return {
@@ -81,9 +111,9 @@ def create_analysis_task(analysis: AnalysisCreate):
             """
             INSERT INTO reports (
                 stock_code, stock_name, price, score, action, trend,
-                summary, risks_json, indicators_json
+                summary, risks_json, indicators_json, user_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 report["stock_code"],
@@ -95,18 +125,22 @@ def create_analysis_task(analysis: AnalysisCreate):
                 report["summary"],
                 json.dumps(report["risks"], ensure_ascii=False),
                 json.dumps(report["indicators"], ensure_ascii=False),
+                user_id,
             ),
         )
         report_id = cursor.lastrowid
         connection.execute(
             """
             INSERT INTO analysis_tasks (
-                task_id, stock_code, status, progress, message, report_id
+                task_id, stock_code, status, progress, message, report_id, user_id
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (task_id, analysis.stock_code, status, progress, message, report_id),
+            (task_id, analysis.stock_code, status, progress, message, report_id, user_id),
         )
+
+    report["report_id"] = report_id
+    _write_analysis_record(report, task_id, user_id)
 
     return {
         "message": "analysis task created",
@@ -119,16 +153,16 @@ def create_analysis_task(analysis: AnalysisCreate):
 
 
 @router.get("/analysis/{task_id}")
-def get_analysis_task(task_id: str):
+def get_analysis_task(task_id: str, user_id: str = Depends(get_current_user_id)):
     with get_connection() as connection:
         row = connection.execute(
             """
             SELECT task_id, stock_code, status, progress, message,
                    report_id, created_at, updated_at
             FROM analysis_tasks
-            WHERE task_id = ?
+            WHERE task_id = ? AND user_id = ?
             """,
-            (task_id,),
+            (task_id, user_id),
         ).fetchone()
 
     if row is None:

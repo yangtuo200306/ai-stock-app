@@ -37,6 +37,9 @@
 - 完成学习和必要记录后，再进入审查模式逐项核对计划。。
 - 后续开发中，在不打断主线的前提下，适时主动介绍与当前阶段相关的 AI 编程工具、MCP、Skill、Agent 工作流或上下文工程方法。
 - 工具学习作为副线，不为使用工具而中断项目主线
+- 涉及新增 API 文件后，必须检查 `backend/app/main.py` 是否注册 router。
+- 涉及受保护业务接口的前端页面，默认使用统一 API client，避免遗漏 `Authorization` token。
+- 涉及数据库索引或唯一约束迁移时，必须检查具体字段列表，不能只判断约束是否存在。
 - 出现报错时，先解释报错含义，再给解决步骤。
 
 ## 4. 项目技术栈
@@ -81,11 +84,12 @@ d:/ai-stock-analysis/stock-analysis-reference
 
 产品定位：
 
-- AI Stock App 是 AI 股票分析助手，不是投资交易软件。
-- 核心能力方向：自选股票、AI 问答、历史分析报告、个人账号。
-- 长期底部导航方向：自选 | 问股 | 报告 | 我的。
-- “我的”承接当前设置页能力，后续扩展登录、注册、账号信息。
-- “大盘”短期不作为底部 Tab；后续可放入问股或报告，例如问大盘、每日市场复盘。
+- AI Stock App 是面向个人投资者的 AI 股票分析助手，不是投资交易软件，也不是完整投研工作台。
+- 核心能力方向：自选股票、AI 问股、分析记录、个人账号。
+- 长期底部导航方向：自选 | 问股 | 记录 | 我的。
+- “记录”用于承接问股记录、自选分析记录、AI 对话记录和后续生成的报告记录；报告是记录中的一种更正式的详情形态。
+- “我的”承接账号、设置和应用信息，后续扩展注册、登录、退出登录、AI 服务状态和免责声明。
+- 页面大优化前，优先完成用户边界、记录体系、自选问股联动、最小用户系统、AI 助手能力增强和功能定型。
 
 已完成阶段：
 
@@ -94,6 +98,8 @@ d:/ai-stock-analysis/stock-analysis-reference
 - 第三阶段：真实行情最小接入（efinance、market_data 服务层、报告展示真实行情）
 - 第四阶段：行情基础能力增强（股票代码标准化、60 秒行情缓存、前端基础校验、行情错误分类）
 - 第五阶段：历史报告列表 + 新导航结构（自选 | 问股 | 报告 | 我的）
+- v0.4：用户边界 + 问股闭环（默认 user_id、records 表、问股/自选写入记录、报告 Tab 改为记录）
+- v0.5：最小用户系统（注册、登录、退出登录、token 鉴权、用户数据隔离、统一 API client）
 
 当前版本状态：
 
@@ -106,11 +112,17 @@ d:/ai-stock-analysis/stock-analysis-reference
 - v0.2 文档总结提交：`c339b96 docs: summarize v0.2 completion`。
 - v0.2 已推送远程。
 - v0.3 计划文档已生成：`docs/plans/v0.3-plan.md`。
-- v0.3 阶段 1 已完成：`efinance` 主源失败后可尝试新浪实时行情和历史 K 线 fallback。
-- v0.3 阶段 2 已完成：问股支持股票问题输入、火山方舟 DeepSeek Endpoint AI 回答和规则回退。
-- v0.3 Web 手动验收已通过。
-- 当前准备进入：v0.3 阶段 3：整体整理、文档同步和提交。
-- v0.3 总体方向：AI 问股可用版，先提升行情稳定性，再接入已有大模型。
+- v0.3 AI 问股可用版已完成、提交并 push。
+- v0.3 最新提交：`0a106e4 feat: add v0.3 market fallback and ai ask`。
+- v0.3 总结文档已生成：`docs/releases/v0.3-summary.md`。
+- v0.3 已完成 efinance 主源 + 新浪实时行情/历史 K 线 fallback。
+- v0.3 已完成问股问题输入、6 位 A 股代码提取、火山方舟 DeepSeek Endpoint AI 回答和规则回退。
+- v0.3 Web 手动验收已通过：输入“000001 怎么看？”可以返回 AI 回答、行情摘要、技术指标和风险提示。
+- 产品总路线文档已生成：`docs/plans/product-roadmap.md`。
+- v0.4 用户边界 + 问股闭环 ✅ 已完成（详见 `docs/releases/v0.4-summary.md`）。
+- v0.5 最小用户系统 ✅ 已完成（详见 `docs/releases/v0.5-summary.md`）。
+- v0.5 已完成注册、登录、退出登录、`/api/auth/me`、token 鉴权和用户数据隔离。
+- 后续总路线：v0.6 AI 助手能力增强，v0.7 功能定型，v0.8 UI/UX 集中优化。
 
 当前后端结构：
 
@@ -120,11 +132,15 @@ backend/
   app/
     __init__.py
     main.py
+    database.py
     api/
       __init__.py
       health.py
+      auth.py
       stocks.py
       analysis.py
+      ask.py
+      records.py
       reports.py
       market.py
     services/
@@ -141,10 +157,15 @@ backend/
 mobile-app/
   App.tsx
   src/
+    api/
+      client.ts
+    contexts/
+      AuthContext.tsx
     navigation/
       AppNavigator.tsx
       WatchlistStackNavigator.tsx
-      ReportStackNavigator.tsx
+      RecordStackNavigator.tsx
+      MineStackNavigator.tsx
     screens/
       WatchlistScreen.tsx
       SettingsScreen.tsx
@@ -152,7 +173,10 @@ mobile-app/
       MarketScreen.tsx
       TaskStatusScreen.tsx
       ReportDetailScreen.tsx
-      ReportHistoryScreen.tsx
+      RecordListScreen.tsx
+      RecordDetailScreen.tsx
+      MineScreen.tsx
+      LoginScreen.tsx
     types/
       index.ts
 ```

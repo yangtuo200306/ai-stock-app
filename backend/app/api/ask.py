@@ -1,9 +1,11 @@
+import json
 import os
 import re
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.database import get_current_user_id, get_connection
 from app.services.llm_client import LlmError, ask_llm
 from app.services.market_data import MarketDataError, get_stock_history, get_stock_quote
 from app.services.report_builder import build_analysis_report
@@ -28,10 +30,10 @@ class AskResponse(BaseModel):
     question: str | None = None
     answer: str
     answer_type: str = "rule"
+    ai_status: str = "ok"
     risks: list[str]
     indicators: dict
     model: str | None = None
-    llm_error: str | None = None
 
 
 def _extract_stock_code(text: str) -> str | None:
@@ -50,8 +52,44 @@ def _build_rule_answer(report: dict) -> str:
     )
 
 
+def _write_ask_record(report: dict, question: str, answer: str, answer_type: str, model: str | None, user_id: str):
+    summary = answer[:80] if len(answer) > 80 else answer
+    if not summary:
+        summary = f"{report['stock_name']} 当前价 {report['price']}，评分 {report['score']}，建议 {report['action']}"
+
+    metadata = {
+        "price": report["price"],
+        "change_pct": report["indicators"]["change_pct"],
+        "score": report["score"],
+        "action": report["action"],
+        "trend": report["trend"],
+        "model": model,
+    }
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO records (user_id, record_type, stock_code, stock_name,
+                                 title, summary, question, answer, answer_type, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                "ask",
+                report["stock_code"],
+                report["stock_name"],
+                f"问股：{report['stock_name']}（{report['stock_code']}）",
+                summary,
+                question,
+                answer,
+                answer_type,
+                json.dumps(metadata, ensure_ascii=False),
+            ),
+        )
+
+
 @router.post("/ask", response_model=AskResponse)
-def ask_stock(ask: AskCreate):
+def ask_stock(ask: AskCreate, user_id: str = Depends(get_current_user_id)):
     stock_code = None
 
     if ask.question:
@@ -80,8 +118,8 @@ def ask_stock(ask: AskCreate):
     report = build_analysis_report(quote, technicals)
 
     answer_type = "rule"
+    ai_status = "fallback"
     model_name = os.environ.get("LLM_MODEL")
-    llm_error = None
     answer = _build_rule_answer(report)
 
     try:
@@ -99,9 +137,12 @@ def ask_stock(ask: AskCreate):
             question=ask.question or f"{stock_code} 怎么样？",
         )
         answer_type = "ai"
+        ai_status = "ok"
         answer = ai_answer
-    except LlmError as error:
-        llm_error = str(error)
+    except LlmError:
+        pass
+
+    _write_ask_record(report, ask.question or "", answer, answer_type, model_name, user_id)
 
     return {
         "stock_code": report["stock_code"],
@@ -114,8 +155,8 @@ def ask_stock(ask: AskCreate):
         "question": ask.question,
         "answer": answer,
         "answer_type": answer_type,
+        "ai_status": ai_status,
         "risks": report["risks"],
         "indicators": report["indicators"],
         "model": model_name,
-        "llm_error": llm_error,
     }

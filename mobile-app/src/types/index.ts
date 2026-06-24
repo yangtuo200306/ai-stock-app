@@ -66,16 +66,61 @@ export interface AskResponse {
   question?: string;
   answer: string;
   answer_type?: string;
+  ai_status?: string;
   risks: string[];
   indicators: ReportIndicators;
   model?: string;
-  llm_error?: string;
+}
+
+export interface RecordItem {
+  id: number;
+  record_type: string;
+  stock_code: string;
+  stock_name: string;
+  title: string;
+  summary: string;
+  question?: string | null;
+  answer_type?: string | null;
+  report_id?: number | null;
+  metadata: {
+    price?: number;
+    change_pct?: number;
+    score?: number;
+    action?: string;
+    trend?: string;
+    model?: string | null;
+    task_id?: string;
+  };
+  created_at: string;
+}
+
+export interface RecordDetail {
+  id: number;
+  record_type: string;
+  stock_code: string;
+  stock_name: string;
+  title: string;
+  summary: string;
+  question?: string | null;
+  answer?: string | null;
+  answer_type?: string | null;
+  report_id?: number | null;
+  metadata: {
+    price?: number;
+    change_pct?: number;
+    score?: number;
+    action?: string;
+    trend?: string;
+    model?: string | null;
+    task_id?: string;
+  };
+  created_at: string;
 }
 
 export type RootTabParamList = {
   自选: undefined;
-  问股: undefined;
-  报告: undefined;
+  问股: { initialQuestion?: string } | undefined;
+  记录: undefined;
   我的: undefined;
 };
 
@@ -85,7 +130,13 @@ export type WatchlistStackParamList = {
   ReportDetail: { reportId: number };
 };
 
-export type ReportStackParamList = {
-  ReportHistory: undefined;
+export type RecordStackParamList = {
+  RecordList: undefined;
+  RecordDetail: { recordId: number };
   ReportDetail: { reportId: number };
+};
+
+export type MineStackParamList = {
+  Mine: undefined;
+  Login: undefined;
 };

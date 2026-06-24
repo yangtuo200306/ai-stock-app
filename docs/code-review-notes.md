@@ -466,3 +466,183 @@
 - 影响：问股页接入 AI 长回答后，页面承载压力明显；报告详情页、历史报告页、自选页等后续也可能出现信息堆叠、阅读体验弱的问题；当前 UI 更像开发验证页面，不像正式产品界面。
 - 当前是否需要立即修：否，v0.3 当前重点是行情 fallback 和 AI 问股链路跑通。
 - 后续建议：单独规划一个 UI/UX 优化阶段，统一页面布局、卡片样式、字体层级、颜色系统和间距；重点重构问股页、报告详情页、历史报告页、自选页；长文本页面使用更适合阅读的结构，逐步从“功能验证型页面”升级为“产品体验型页面”。
+
+## 问题 52：records.metadata_json 仍然是松散 JSON 字段
+
+- 位置：`backend/app/database.py`、`backend/app/api/records.py`
+- 类型：字段设计隐患
+- 现象：`metadata_json` 存储 JSON 字符串，前后端通过人工约定字段结构。
+- 影响：短期灵活；字段越来越多后，前后端需要人工约定，容易不一致。
+- 当前是否需要立即修：否。
+- 后续建议：后续记录类型稳定后，可拆分更明确字段或定义更严格的响应模型。
+
+## 问题 53：records.py 对 metadata_json 缺少异常保护
+
+- 位置：`backend/app/api/records.py`
+- 类型：健壮性隐患
+- 现象：直接 `json.loads(row["metadata_json"])`，没有异常保护。
+- 影响：如果数据库里 `metadata_json` 损坏，records 接口可能返回 500。
+- 当前是否需要立即修：否。
+- 后续建议：后续可抽出 `safe_json_loads`，解析失败时返回 `{}`。
+
+## 问题 54：新增 API 文件后容易忘记在 main.py 注册 router
+
+- 位置：`backend/app/main.py`、`backend/app/api/*.py`
+- 类型：流程与验证问题
+- 现象：新增 API 文件后，如果忘记在 `main.py` 中 `app.include_router(...)`，接口会 404。
+- 影响：文件存在但接口不可访问，前端请求会 404。
+- 当前是否需要立即修：否，当前已正确注册。
+- 后续建议：后续新增 API 文件后，把"main.py 注册 router"作为固定检查项。
+
+## 问题 55：stocks.code 仍保留全局 UNIQUE 约束
+
+- 位置：`backend/app/database.py`、`backend/app/api/stocks.py`
+- 类型：数据隔离隐患
+- 现象：即使新增了 `user_id`，`stocks.code` 仍是全局 `UNIQUE`。
+- 影响：未来多用户时，不同用户不能同时添加同一只股票。
+- 当前是否需要立即修：已修复。
+- 后续建议：v0.5 已重建 stocks 表唯一约束为 `(user_id, code)`。
+
+## 问题 56：ask.py 捕获 LlmError 后完全吞掉错误
+
+- 位置：`backend/app/api/ask.py`
+- 类型：调试与日志隐患
+- 现象：`except LlmError: pass`，不记录任何日志。
+- 影响：前端不会暴露 llm_error 是正确的，但后端也没有日志，后续排查大模型失败原因会困难。
+- 当前是否需要立即修：否。
+- 后续建议：后续增加后端日志记录，只给开发者看，不返回给前端。
+
+## 问题 57：answer_type 和 ai_status 当前语义有重叠
+
+- 位置：`backend/app/api/ask.py`、`mobile-app/src/types/index.ts`
+- 类型：字段设计隐患
+- 现象：当前 `answer_type=ai/rule` 与 `ai_status=ok/fallback` 都在表达 AI 是否成功。
+- 影响：短期可用；后续若不明确边界，前端可能不知道该依赖哪个字段。
+- 当前是否需要立即修：否。
+- 后续建议：后续明确：`answer_type` 表示展示内容来源，`ai_status` 表示模型调用状态。
+
+## 问题 58：analysis.py 写报告和写记录不是显式同一个事务边界
+
+- 位置：`backend/app/api/analysis.py`
+- 类型：数据一致性隐患
+- 现象：报告和任务在一个 `with get_connection()` 中写入，随后 `_write_analysis_record` 又打开新连接写记录。
+- 影响：如果报告和任务写入成功，但记录写入失败，可能出现"有报告但没有记录"。
+- 当前是否需要立即修：否。
+- 后续建议：后续可把记录写入放入同一个数据库连接中，保证任务、报告、记录一起成功或一起失败。
+
+## 问题 59：问股记录写入失败会影响问股接口返回
+
+- 位置：`backend/app/api/ask.py`
+- 类型：健壮性隐患
+- 现象：`_write_ask_record` 没有异常保护。
+- 影响：如果 records 表异常或写入失败，问股本身已经生成答案，但接口仍可能返回 500。
+- 当前是否需要立即修：否。
+- 后续建议：后续讨论是否让记录写入失败不影响主流程，或统一事务保证一致性。
+
+## 问题 60：RecordItem / RecordDetail.metadata 仍是前端手写松散结构
+
+- 位置：`mobile-app/src/types/index.ts`
+- 类型：类型同步隐患
+- 现象：`metadata` 中 `price`、`change_pct`、`score`、`action`、`trend` 等字段由前后端人工约定。
+- 影响：后端 `metadata_json` 字段变化时，前端类型不会自动同步。
+- 当前是否需要立即修：否。
+- 后续建议：后续可考虑让记录 metadata 更结构化，或通过 OpenAPI 生成前端类型。
+
+## 问题 61：记录模块新增页面较多，需检查旧报告模块引用是否清理干净
+
+- 位置：`mobile-app/src/navigation/RecordStackNavigator.tsx`、`mobile-app/src/screens/RecordListScreen.tsx`、`mobile-app/src/screens/RecordDetailScreen.tsx`
+- 类型：文件清理问题
+- 现象：删除了 `ReportStackNavigator` 和 `ReportHistoryScreen`，新增记录模块文件。
+- 影响：如果仍有旧引用，可能导致前端编译失败。
+- 当前是否需要立即修：是，审查阶段必须重点检查。
+- 后续建议：后续删除文件前先搜索引用，确认无残留后再删除。
+
+## 问题 62：AskScreen 加入自选失败时仍提示"已加入自选"
+
+- 位置：`mobile-app/src/screens/AskScreen.tsx`
+- 类型：错误处理隐患
+- 现象：`handleAddToWatchlist` 中 `response.ok` 为 false 或 `catch` 时也显示"已加入自选"。
+- 影响：如果后端服务异常或写入失败，用户会被误导。
+- 当前是否需要立即修：否，符合计划中"重复加入仍提示已加入自选"的最小实现，但实现过宽。
+- 后续建议：后续区分重复加入和真实失败；失败时提示"加入自选失败，请稍后重试"。
+
+## 问题 63：AskScreen 的 initialQuestion 参数不会在使用后清空
+
+- 位置：`mobile-app/src/screens/AskScreen.tsx`
+- 类型：导航参数隐患
+- 现象：从自选页跳转问股后，`initialQuestion` 会填入输入框；如果后续路由参数保留，可能再次影响输入框。
+- 影响：短期影响较小；复杂导航场景下可能出现旧问题覆盖用户输入。
+- 当前是否需要立即修：否。
+- 后续建议：后续可在填入后清理参数，或只在页面聚焦且参数变化时处理。
+
+## 问题 64：WatchlistScreen 使用 useNavigation<any>() 进行跨 Tab 跳转
+
+- 位置：`mobile-app/src/screens/WatchlistScreen.tsx`
+- 类型：类型设计隐患
+- 现象：为了从自选 Stack 跳到问股 Tab，当前使用了 `any` 类型。
+- 影响：功能可用，但失去了 TypeScript 对导航参数的检查，参数名写错时编译期不一定发现。
+- 当前是否需要立即修：否。
+- 后续建议：后续补充组合导航类型，例如 `NativeStackNavigationProp` + `BottomTabNavigationProp`。
+
+## 问题 65：WatchlistScreen 中从同一个包重复导入 useNavigation
+
+- 位置：`mobile-app/src/screens/WatchlistScreen.tsx`
+- 类型：代码清理
+- 现象：`import { useNavigation } from '@react-navigation/native';` 和 `import { useNavigation as useTabNavigation } from '@react-navigation/native';` 分开导入。
+- 影响：不影响运行，但可读性一般。
+- 当前是否需要立即修：否。
+- 后续建议：后续可合并为同一行导入，或使用更明确的导航类型。
+
+## 问题 66：logout 当前会删除用户所有 token
+
+- 位置：`backend/app/api/auth.py`
+- 类型：账号系统阶段性限制
+- 现象：`logout` 根据 `user_id` 删除该用户所有 token，而不是只删除当前请求携带的 token。
+- 影响：如果后续支持多设备登录，一个设备退出会让同一用户其他设备也失效。
+- 当前是否需要立即修：否，v0.5 最小用户系统可接受。
+- 后续建议：后续可让鉴权依赖同时返回当前 token，退出时只删除当前 token。
+
+## 问题 67：前端 API client 没有统一错误处理
+
+- 位置：`mobile-app/src/api/client.ts`
+- 类型：接口错误处理隐患
+- 现象：`apiGet` / `apiPost` 直接返回 `res.json()`，没有统一判断 `response.ok`。
+- 影响：401、400、500 等错误需要页面自行判断返回内容，后续页面多了会重复处理。
+- 当前是否需要立即修：否，v0.5 最小闭环可接受。
+- 后续建议：后续可统一抛出 API 错误对象，并在 401 时引导重新登录。
+
+## 问题 68：MineScreen 的 health 检查仍使用独立 fetch
+
+- 位置：`mobile-app/src/screens/MineScreen.tsx`
+- 类型：代码一致性限制
+- 现象：`handleTestConnection` 仍直接调用 `fetch` 检查 `/api/health`。
+- 影响：不影响功能，因为 health 接口不需要 token；但和统一 API client 的方向不完全一致。
+- 当前是否需要立即修：否。
+- 后续建议：后续可给 API client 增加不带 token 的 `apiHealthCheck` 或 `apiPublicGet`。
+
+## 问题 69：旧 default_user 数据与真实用户 ID 格式不一致
+
+- 位置：`backend/app/database.py`、`backend/app/api/stocks.py`、`backend/app/api/reports.py`、`backend/app/api/records.py`
+- 类型：数据迁移阶段性限制
+- 现象：v0.4 旧数据使用 `default_user`，v0.5 新数据使用数字用户 ID 字符串。
+- 影响：旧数据不会自动归属到新注册用户，新用户登录后看不到旧数据。
+- 当前是否需要立即修：否，学习项目当前可接受。
+- 后续建议：如果需要保留旧数据，可设计一次性迁移，把 `default_user` 数据归属到首个真实用户或指定用户。
+
+## 问题 70：受保护接口改造后，遗漏页面级 fetch 容易导致 401
+
+- 位置：`mobile-app/src/screens/*`
+- 类型：认证接入隐患
+- 现象：v0.5 后多数业务接口都需要 token，如果某个页面仍直接 `fetch`，就不会带 `Authorization`。
+- 影响：页面可能在登录后仍访问失败，表现为任务不存在、报告不存在或加载失败。
+- 当前是否需要立即修：已修复 `TaskStatusScreen` 和 `ReportDetailScreen`。
+- 后续建议：后续新增受保护接口页面时，默认使用统一 API client。
+
+## 问题 71：数据库结构迁移判断需要检查约束字段而不是只检查约束存在
+
+- 位置：`backend/app/database.py`
+- 类型：数据库迁移隐患
+- 现象：旧结构 `UNIQUE(code)` 和新结构 `UNIQUE(user_id, code)` 都会生成唯一索引。
+- 影响：只判断是否存在唯一索引会误判新旧结构，可能导致重复迁移。
+- 当前是否需要立即修：已修复。
+- 后续建议：后续迁移索引或约束时，应检查具体字段列表。

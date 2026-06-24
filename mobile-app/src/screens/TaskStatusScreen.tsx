@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
+import { apiGet } from '../api/client';
 import type { AnalysisTask, WatchlistStackParamList } from '../types';
-
-const BACKEND_URL_STORAGE_KEY = 'backendUrl';
 
 type RouteType = RouteProp<WatchlistStackParamList, 'TaskStatus'>;
 type NavProp = NativeStackNavigationProp<WatchlistStackParamList, 'TaskStatus'>;
@@ -19,15 +17,8 @@ export default function TaskStatusScreen() {
   const [error, setError] = useState('');
 
   const fetchTask = async () => {
-    const backendUrl = await AsyncStorage.getItem(BACKEND_URL_STORAGE_KEY);
-    if (!backendUrl) {
-      setError('后端地址未配置');
-      return;
-    }
-
     try {
-      const res = await fetch(`${backendUrl}/api/analysis/${taskId}`);
-      const data = await res.json();
+      const data = await apiGet(`/api/analysis/${taskId}`);
       if (data.task_id) {
         setTask(data as AnalysisTask);
         setError('');

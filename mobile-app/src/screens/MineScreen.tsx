@@ -1,10 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useAuth } from '../contexts/AuthContext';
+import type { MineStackParamList } from '../types';
 
 const BACKEND_URL_STORAGE_KEY = 'backendUrl';
 
+type NavProp = NativeStackNavigationProp<MineStackParamList, 'Mine'>;
+
 export default function MineScreen() {
+  const navigation = useNavigation<NavProp>();
+  const { isLoggedIn, username, logout } = useAuth();
   const [backendUrl, setBackendUrl] = useState('');
   const [savedBackendUrl, setSavedBackendUrl] = useState('');
   const [message, setMessage] = useState('暂未操作');
@@ -60,14 +68,30 @@ export default function MineScreen() {
     <View style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>我的</Text>
-        <Text style={styles.description}>个人中心能力后续开放</Text>
-        <Text style={styles.placeholder}>登录 / 注册：后续开放</Text>
+
+        {isLoggedIn ? (
+          <View style={styles.userSection}>
+            <Text style={styles.usernameText}>当前用户：{username}</Text>
+            <Pressable style={styles.logoutButton} onPress={logout}>
+              <Text style={styles.logoutButtonText}>退出登录</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.userSection}>
+            <Text style={styles.placeholder}>未登录</Text>
+            <Pressable
+              style={styles.loginButton}
+              onPress={() => navigation.navigate('Login')}
+            >
+              <Text style={styles.loginButtonText}>登录 / 注册</Text>
+            </Pressable>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>应用信息</Text>
-          <Text style={styles.infoText}>当前版本：v0.2</Text>
-          <Text style={styles.infoText}>当前能力：基础分析增强版</Text>
-          <Text style={styles.infoText}>当前阶段：问股最小版 / 我的页基础整理</Text>
+          <Text style={styles.infoText}>当前版本：v0.5</Text>
+          <Text style={styles.infoText}>当前能力：最小用户系统</Text>
         </View>
 
         <View style={styles.section}>
@@ -123,17 +147,45 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
   },
-  description: {
+  userSection: {
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  usernameText: {
     fontSize: 16,
-    color: '#475569',
-    textAlign: 'center',
-    marginBottom: 8,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginBottom: 12,
   },
   placeholder: {
     fontSize: 14,
     color: '#64748b',
-    textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  loginButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  loginButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  logoutButton: {
+    backgroundColor: '#fee2e2',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  logoutButtonText: {
+    color: '#dc2626',
+    fontSize: 16,
+    fontWeight: '700',
   },
   section: {
     borderTopWidth: 1,

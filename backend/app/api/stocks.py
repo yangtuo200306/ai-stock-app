@@ -1,7 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.database import get_connection
+from app.database import get_current_user_id, get_connection
 
 router = APIRouter(prefix="/api", tags=["stocks"])
 
@@ -12,10 +12,11 @@ class StockCreate(BaseModel):
 
 
 @router.get("/stocks")
-def get_stocks():
+def get_stocks(user_id: str = Depends(get_current_user_id)):
     with get_connection() as connection:
         rows = connection.execute(
-            "SELECT code, name FROM stocks ORDER BY id"
+            "SELECT code, name FROM stocks WHERE user_id = ? ORDER BY id",
+            (user_id,),
         ).fetchall()
 
     items = [
@@ -30,7 +31,7 @@ def get_stocks():
 
 
 @router.post("/stocks")
-def add_stock(stock: StockCreate):
+def add_stock(stock: StockCreate, user_id: str = Depends(get_current_user_id)):
     item = {
         "code": stock.code,
         "name": stock.name,
@@ -38,8 +39,8 @@ def add_stock(stock: StockCreate):
 
     with get_connection() as connection:
         connection.execute(
-            "INSERT OR IGNORE INTO stocks (code, name) VALUES (?, ?)",
-            (stock.code, stock.name),
+            "INSERT OR IGNORE INTO stocks (code, name, user_id) VALUES (?, ?, ?)",
+            (stock.code, stock.name, user_id),
         )
 
     return {
@@ -49,11 +50,11 @@ def add_stock(stock: StockCreate):
 
 
 @router.delete("/stocks/{code}")
-def delete_stock(code: str):
+def delete_stock(code: str, user_id: str = Depends(get_current_user_id)):
     with get_connection() as connection:
         cursor = connection.execute(
-            "DELETE FROM stocks WHERE code = ?",
-            (code,),
+            "DELETE FROM stocks WHERE code = ? AND user_id = ?",
+            (code, user_id),
         )
 
     if cursor.rowcount > 0:

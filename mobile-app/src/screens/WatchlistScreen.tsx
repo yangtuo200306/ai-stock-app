@@ -11,9 +11,10 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation as useTabNavigation } from '@react-navigation/native';
+import { apiGet, apiPost, apiDelete } from '../api/client';
 import type { Stock, WatchlistStackParamList } from '../types';
 
-const BACKEND_URL_STORAGE_KEY = 'backendUrl';
 const TASK_IDS_KEY = 'stockTaskIds';
 
 type NavProp = NativeStackNavigationProp<WatchlistStackParamList, 'Watchlist'>;
@@ -40,6 +41,7 @@ function normalizeAShareCode(code: string) {
 
 export default function WatchlistScreen() {
   const navigation = useNavigation<NavProp>();
+  const tabNavigation = useTabNavigation<any>();
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -47,51 +49,30 @@ export default function WatchlistScreen() {
   const [newName, setNewName] = useState('');
   const [taskStatuses, setTaskStatuses] = useState<Record<string, string>>({});
 
-  const getBackendUrl = useCallback(async () => {
-    return await AsyncStorage.getItem(BACKEND_URL_STORAGE_KEY);
-  }, []);
-
   const loadStocks = useCallback(async () => {
-    const savedBackendUrl = await getBackendUrl();
-
-    if (!savedBackendUrl) {
-      setLoadError('请先在设置页配置后端地址');
-      setStocks([]);
-      return;
-    }
-
     setIsLoading(true);
     setLoadError('');
 
     try {
-      const response = await fetch(`${savedBackendUrl}/api/stocks`);
-      const data = await response.json();
-
-      if (data.items) {
-        setStocks(data.items);
-      } else {
-        setStocks([]);
-      }
+      const data = await apiGet('/api/stocks');
+      setStocks(data.items ?? []);
     } catch {
       setLoadError('加载自选股失败，请检查后端服务');
       setStocks([]);
     } finally {
       setIsLoading(false);
     }
-  }, [getBackendUrl]);
+  }, []);
 
   const loadTaskStatuses = useCallback(async () => {
     const saved = await AsyncStorage.getItem(TASK_IDS_KEY);
     if (!saved) return;
     const taskIds: Record<string, string> = JSON.parse(saved);
-    const backendUrl = await getBackendUrl();
-    if (!backendUrl) return;
 
     const newStatuses: Record<string, string> = {};
     for (const [stockCode, taskId] of Object.entries(taskIds)) {
       try {
-        const res = await fetch(`${backendUrl}/api/analysis/${taskId}`);
-        const data = await res.json();
+        const data = await apiGet(`/api/analysis/${taskId}`);
         if (data.status) {
           newStatuses[stockCode] = data.status;
         }
@@ -100,7 +81,7 @@ export default function WatchlistScreen() {
       }
     }
     setTaskStatuses(newStatuses);
-  }, [getBackendUrl]);
+  }, []);
 
   useEffect(() => {
     loadStocks();
@@ -124,20 +105,9 @@ export default function WatchlistScreen() {
       return;
     }
 
-    const backendUrl = await getBackendUrl();
-    if (!backendUrl) {
-      Alert.alert('提示', '请先在设置页配置后端地址');
-      return;
-    }
-
     try {
-      const response = await fetch(`${backendUrl}/api/stocks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: normalizedCode, name: stockName }),
-      });
-
-      if (response.ok) {
+      const data = await apiPost('/api/stocks', { code: normalizedCode, name: stockName });
+      if (data.message === 'stock added') {
         setNewCode('');
         setNewName('');
         await loadStocks();
@@ -147,19 +117,13 @@ export default function WatchlistScreen() {
     } catch {
       Alert.alert('错误', '添加自选股失败，请检查后端服务');
     }
-  }, [newCode, newName, getBackendUrl, loadStocks]);
+  }, [newCode, newName, loadStocks]);
 
   const handleDeleteStock = useCallback(
     async (code: string) => {
-      const backendUrl = await getBackendUrl();
-      if (!backendUrl) return;
-
       try {
-        const response = await fetch(`${backendUrl}/api/stocks/${code}`, {
-          method: 'DELETE',
-        });
-
-        if (response.ok) {
+        const { ok } = await apiDelete(`/api/stocks/${code}`);
+        if (ok) {
           const saved = await AsyncStorage.getItem(TASK_IDS_KEY);
           if (saved) {
             const taskIds: Record<string, string> = JSON.parse(saved);
@@ -177,25 +141,14 @@ export default function WatchlistScreen() {
         Alert.alert('错误', '删除自选股失败');
       }
     },
-    [getBackendUrl, loadStocks],
+    [loadStocks],
   );
 
   const handleCreateAnalysis = useCallback(
     async (stock: Stock) => {
-      const backendUrl = await getBackendUrl();
-      if (!backendUrl) return;
-
       try {
-        const response = await fetch(`${backendUrl}/api/analysis`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ stock_code: stock.code }),
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.task_id) {
-          // Save task_id for this stock
+        const data = await apiPost('/api/analysis', { stock_code: stock.code });
+        if (data.task_id) {
           const saved = await AsyncStorage.getItem(TASK_IDS_KEY);
           const taskIds: Record<string, string> = saved ? JSON.parse(saved) : {};
           taskIds[stock.code] = data.task_id;
@@ -214,7 +167,14 @@ export default function WatchlistScreen() {
         Alert.alert('错误', '创建分析任务失败，请检查后端服务');
       }
     },
-    [getBackendUrl, navigation],
+    [navigation],
+  );
+
+  const handleAskAI = useCallback(
+    (stock: Stock) => {
+      tabNavigation.navigate('问股', { initialQuestion: `${stock.code} 怎么看？` });
+    },
+    [tabNavigation],
   );
 
   const getStatusLabel = (status: string) => {
@@ -266,6 +226,12 @@ export default function WatchlistScreen() {
             </View>
           ) : null}
           <Pressable
+            style={styles.askButton}
+            onPress={() => handleAskAI(item)}
+          >
+            <Text style={styles.askButtonText}>问 AI</Text>
+          </Pressable>
+          <Pressable
             style={styles.deleteButton}
             onPress={() => handleDeleteStock(item.code)}
           >
@@ -281,7 +247,6 @@ export default function WatchlistScreen() {
       <View style={styles.card}>
         <Text style={styles.title}>自选股列表</Text>
 
-        {/* Add stock form */}
         <View style={styles.addForm}>
           <TextInput
             style={styles.input}
@@ -422,7 +387,7 @@ const styles = StyleSheet.create({
   stockActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -432,6 +397,17 @@ const styles = StyleSheet.create({
   statusText: {
     color: '#ffffff',
     fontSize: 12,
+    fontWeight: '600',
+  },
+  askButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#dbeafe',
+  },
+  askButtonText: {
+    color: '#2563eb',
+    fontSize: 14,
     fontWeight: '600',
   },
   deleteButton: {

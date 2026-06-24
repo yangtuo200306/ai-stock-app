@@ -1,22 +1,24 @@
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.database import get_connection
+from app.database import get_current_user_id, get_connection
 
 router = APIRouter(prefix="/api", tags=["reports"])
 
 
 @router.get("/reports")
-def get_reports():
+def get_reports(user_id: str = Depends(get_current_user_id)):
     with get_connection() as connection:
         rows = connection.execute(
             """
             SELECT id, stock_code, stock_name, price, score, action, trend,
                    indicators_json, created_at
             FROM reports
+            WHERE user_id = ?
             ORDER BY id DESC
-            """
+            """,
+            (user_id,),
         ).fetchall()
 
     items = []
@@ -42,16 +44,16 @@ def get_reports():
 
 
 @router.get("/reports/{report_id}")
-def get_report(report_id: int):
+def get_report(report_id: int, user_id: str = Depends(get_current_user_id)):
     with get_connection() as connection:
         row = connection.execute(
             """
             SELECT id, stock_code, stock_name, price, score, action, trend,
                    summary, risks_json, indicators_json, created_at
             FROM reports
-            WHERE id = ?
+            WHERE id = ? AND user_id = ?
             """,
-            (report_id,),
+            (report_id, user_id),
         ).fetchone()
 
     if row is None:
