@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -11,17 +11,20 @@ import {
 import { useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { apiPost } from '../api/client';
-import type { AskResponse } from '../types';
+import type { AskMessage, AskResponse } from '../types';
 
 type AskRouteProp = RouteProp<{ 问股: { initialQuestion?: string } }, '问股'>;
 
 export default function AskScreen() {
   const route = useRoute<AskRouteProp>();
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<AskMessage[]>([]);
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<AskResponse | null>(null);
+  const [latestResult, setLatestResult] = useState<AskResponse | null>(null);
   const [addToWatchlistLoading, setAddToWatchlistLoading] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (route.params?.initialQuestion) {
@@ -37,13 +40,37 @@ export default function AskScreen() {
 
     setLoading(true);
     setError('');
-    setResult(null);
 
     try {
-      const data = await apiPost('/api/ask', { question: question.trim() });
+      const body: Record<string, unknown> = { question: question.trim() };
+      if (sessionId) {
+        body.session_id = sessionId;
+      }
+
+      const data = await apiPost('/api/ask', body);
 
       if (data.stock_code) {
-        setResult(data as AskResponse);
+        const result = data as AskResponse;
+
+        // Build messages from result
+        const newMessages: AskMessage[] = [
+          ...messages,
+          { id: Date.now(), role: 'user', content: question.trim(), created_at: new Date().toISOString() },
+          {
+            id: result.message_id ?? Date.now() + 1,
+            role: 'assistant',
+            content: result.answer,
+            answer_type: result.answer_type,
+            ai_status: result.ai_status,
+            model: result.model,
+            created_at: new Date().toISOString(),
+          },
+        ];
+
+        setMessages(newMessages);
+        setLatestResult(result);
+        setSessionId(result.session_id ?? null);
+        setQuestion('');
       } else {
         setError(data.detail || '问股失败，请稍后重试');
       }
@@ -55,13 +82,13 @@ export default function AskScreen() {
   };
 
   const handleAddToWatchlist = async () => {
-    if (!result) return;
+    if (!latestResult) return;
 
     setAddToWatchlistLoading(true);
     try {
       const data = await apiPost('/api/stocks', {
-        code: result.stock_code,
-        name: result.stock_name,
+        code: latestResult.stock_code,
+        name: latestResult.stock_name,
       });
 
       if (data.message === 'stock added') {
@@ -76,16 +103,16 @@ export default function AskScreen() {
     }
   };
 
-  const changeColor = result
-    ? result.change_pct > 0
+  const changeColor = latestResult
+    ? latestResult.change_pct > 0
       ? '#dc2626'
-      : result.change_pct < 0
+      : latestResult.change_pct < 0
         ? '#16a34a'
         : '#475569'
     : '#475569';
 
   return (
-    <ScrollView style={styles.scrollContainer}>
+    <ScrollView style={styles.scrollContainer} ref={scrollRef}>
       <View style={styles.container}>
         <View style={styles.card}>
           <Text style={styles.title}>问股</Text>
@@ -104,50 +131,71 @@ export default function AskScreen() {
             onPress={handleAsk}
             disabled={loading}
           >
-            <Text style={styles.primaryButtonText}>{loading ? '分析中...' : '开始问股'}</Text>
+            <Text style={styles.primaryButtonText}>{loading ? '分析中...' : '发送'}</Text>
           </Pressable>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          {result ? (
+          {messages.length > 0 ? (
+            <View style={styles.messagesContainer}>
+              {messages.map((msg, index) => (
+                <View
+                  key={`${msg.id}-${index}`}
+                  style={[
+                    styles.messageBubble,
+                    msg.role === 'user' ? styles.userBubble : styles.assistantBubble,
+                  ]}
+                >
+                  <Text style={styles.messageRole}>
+                    {msg.role === 'user' ? '我' : msg.answer_type === 'ai' ? 'AI 回答' : '规则回退回答'}
+                  </Text>
+                  <Text style={styles.messageContent}>{msg.content}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {latestResult ? (
             <View style={styles.resultCard}>
               <Text style={styles.stockName}>
-                {result.stock_name}（{result.stock_code}）
+                {latestResult.stock_name}（{latestResult.stock_code}）
               </Text>
               <View style={styles.row}>
                 <Text style={styles.label}>当前价</Text>
-                <Text style={styles.value}>{result.price}</Text>
+                <Text style={styles.value}>{latestResult.price}</Text>
               </View>
               <View style={styles.row}>
                 <Text style={styles.label}>涨跌幅</Text>
-                <Text style={[styles.value, { color: changeColor }]}>{result.change_pct}%</Text>
+                <Text style={[styles.value, { color: changeColor }]}>{latestResult.change_pct}%</Text>
               </View>
               <View style={styles.row}>
                 <Text style={styles.label}>趋势</Text>
-                <Text style={styles.value}>{result.trend}</Text>
+                <Text style={styles.value}>{latestResult.trend}</Text>
               </View>
               <View style={styles.row}>
                 <Text style={styles.label}>建议</Text>
-                <Text style={styles.value}>{result.action}</Text>
+                <Text style={styles.value}>{latestResult.action}</Text>
               </View>
               <View style={styles.row}>
                 <Text style={styles.label}>评分</Text>
-                <Text style={styles.value}>{result.score}</Text>
+                <Text style={styles.value}>{latestResult.score}</Text>
               </View>
-
-              <Text style={styles.sectionTitle}>
-                {result.answer_type === 'ai' ? 'AI 回答' : '规则回退回答'}
-              </Text>
-              <Text style={styles.answer}>{result.answer}</Text>
 
               <Text style={styles.sectionTitle}>技术指标</Text>
               <Text style={styles.indicatorText}>
-                MA5：{result.indicators.ma5 ?? '-'} ｜ MA10：{result.indicators.ma10 ?? '-'} ｜ MA20：
-                {result.indicators.ma20 ?? '-'}
+                MA5：{latestResult.indicators.ma5 ?? '-'} ｜ MA10：{latestResult.indicators.ma10 ?? '-'} ｜ MA20：
+                {latestResult.indicators.ma20 ?? '-'}
+              </Text>
+              <Text style={styles.indicatorText}>
+                RSI(6)：{latestResult.indicators.rsi6 ?? '-'} ｜ RSI(12)：{latestResult.indicators.rsi12 ?? '-'}
+              </Text>
+              <Text style={styles.indicatorText}>
+                成交量：{latestResult.indicators.volume_signal ?? '-'}
+                {latestResult.indicators.volume_ratio != null ? `（比值 ${latestResult.indicators.volume_ratio}）` : ''}
               </Text>
 
               <Text style={styles.sectionTitle}>风险提示</Text>
-              {result.risks.map((risk) => (
+              {latestResult.risks.map((risk) => (
                 <Text key={risk} style={styles.riskText}>
                   • {risk}
                 </Text>
@@ -229,6 +277,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
   },
+  messagesContainer: {
+    marginBottom: 16,
+  },
+  messageBubble: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+  },
+  userBubble: {
+    backgroundColor: '#eff6ff',
+    alignSelf: 'flex-end',
+  },
+  assistantBubble: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignSelf: 'flex-start',
+  },
+  messageRole: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 4,
+  },
+  messageContent: {
+    fontSize: 14,
+    color: '#334155',
+    lineHeight: 22,
+  },
   resultCard: {
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
@@ -260,11 +337,6 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     marginTop: 12,
     marginBottom: 6,
-  },
-  answer: {
-    fontSize: 14,
-    color: '#334155',
-    lineHeight: 22,
   },
   indicatorText: {
     fontSize: 14,

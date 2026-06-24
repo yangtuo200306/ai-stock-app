@@ -333,6 +333,9 @@ Tab + Stack 导航结构通过
 第四阶段已完成：行情基础能力增强
 第五阶段已完成：历史报告列表 + 新导航结构
 v0.3 已完成：行情 fallback + AI 问股可用版
+v0.4 已完成：用户边界 + 问股闭环
+v0.5 已完成：最小用户系统
+v0.6 已完成：AI 助手能力增强
 ```
 
 已完成内容：
@@ -375,8 +378,11 @@ v0.3 已完成：行情 fallback + AI 问股可用版
    - 学习内容：密码哈希与 salt、uuid token、Authorization Bearer、FastAPI Depends 鉴权、用户数据隔离、SQLite 唯一约束迁移、React Context 登录状态、统一 API client。
    - 新增问题：6 条（问题 66-71），已记录到 code-review-notes.md。
    - 总结文档：docs/releases/v0.5-summary.md。
-3. v0.6：AI 助手能力增强，学习股票简称识别、最小多轮追问、技术指标增强和 AI 回答结构边界。
-4. v0.7：功能定型，学习记录详情、报告作为记录类型、API 错误结构统一和调试字段清理。
+3. v0.6：AI 助手能力增强 ✅ 已完成
+   - 学习内容：ask_sessions / ask_messages 两层会话结构、records 作为历史摘要入口、最小多轮追问、股票简称识别、RSI、成交量变化、AI 上下文边界、问股页从单结果演进为消息列表。
+   - 新增问题：16 条（问题 72-87），已记录到 code-review-notes.md。
+   - 总结文档：docs/releases/v0.6-summary.md。
+4. v0.7：功能定型与交互补齐，学习未登录态引导、新建会话、记录详情继续追问、records 更新时间排序、API 错误结构统一和 ask service 拆分。
 5. v0.8：UI/UX 集中优化，学习移动端页面结构、加载态、空状态、错误态和长回答阅读体验。
 
 ## 9. 和 AI 助手协作方式
@@ -470,9 +476,11 @@ ai-stock-app/docs/releases/v0.1-summary.md
 17. v0.4 用户边界 + 问股闭环已完成，总结文档：`docs/releases/v0.4-summary.md`。
 18. v0.5 最小用户系统已完成，总结文档：`docs/releases/v0.5-summary.md`。
 19. 当前已具备注册、登录、退出登录、token 鉴权和用户数据隔离。
+20. v0.6 AI 助手能力增强已完成，总结文档：`docs/releases/v0.6-summary.md`。
+21. 当前已具备股票简称识别、最小多轮追问、RSI / 成交量指标增强、AI 上下文追问和问股历史详情。
 
 建议下一步：
 
-1. 先阅读 `docs/plans/product-roadmap.md`，确认 v0.6 方向。
-2. 单独制定 `docs/plans/v0.6-plan.md`，不要直接改代码。
-3. v0.6 重点围绕 AI 助手能力增强制定小计划。
+1. 先阅读 `docs/releases/v0.6-summary.md`，确认 AI 助手增强版完成内容。
+2. 单独制定 `docs/plans/v0.7-plan.md`，不要直接改代码。
+3. v0.7 重点围绕功能定型与交互补齐制定小计划。

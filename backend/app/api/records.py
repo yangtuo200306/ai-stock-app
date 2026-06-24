@@ -13,7 +13,8 @@ def get_records(user_id: str = Depends(get_current_user_id)):
         rows = connection.execute(
             """
             SELECT id, record_type, stock_code, stock_name, title, summary,
-                   question, answer_type, report_id, metadata_json, created_at
+                   question, answer_type, report_id, metadata_json, created_at,
+                   session_id
             FROM records
             WHERE user_id = ?
             ORDER BY id DESC
@@ -37,6 +38,7 @@ def get_records(user_id: str = Depends(get_current_user_id)):
             "report_id": row["report_id"],
             "metadata": metadata,
             "created_at": row["created_at"],
+            "session_id": row["session_id"],
         })
 
     return {"items": items}
@@ -48,7 +50,8 @@ def get_record(record_id: int, user_id: str = Depends(get_current_user_id)):
         row = connection.execute(
             """
             SELECT id, record_type, stock_code, stock_name, title, summary,
-                   question, answer, answer_type, report_id, metadata_json, created_at
+                   question, answer, answer_type, report_id, metadata_json, created_at,
+                   session_id
             FROM records
             WHERE id = ? AND user_id = ?
             """,
@@ -63,7 +66,7 @@ def get_record(record_id: int, user_id: str = Depends(get_current_user_id)):
 
     metadata = json.loads(row["metadata_json"]) if row["metadata_json"] else {}
 
-    return {
+    result = {
         "id": row["id"],
         "record_type": row["record_type"],
         "stock_code": row["stock_code"],
@@ -76,4 +79,22 @@ def get_record(record_id: int, user_id: str = Depends(get_current_user_id)):
         "report_id": row["report_id"],
         "metadata": metadata,
         "created_at": row["created_at"],
+        "session_id": row["session_id"],
+        "messages": None,
     }
+
+    session_id = row["session_id"]
+    if session_id:
+        with get_connection() as connection:
+            msg_rows = connection.execute(
+                """
+                SELECT id, role, content, answer_type, ai_status, model, created_at
+                FROM ask_messages
+                WHERE session_id = ? AND user_id = ?
+                ORDER BY id ASC
+                """,
+                (session_id, user_id),
+            ).fetchall()
+        result["messages"] = [dict(m) for m in msg_rows]
+
+    return result

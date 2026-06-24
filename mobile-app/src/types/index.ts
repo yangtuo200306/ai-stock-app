@@ -26,6 +26,10 @@ export interface ReportIndicators {
   bias_ma20?: number;
   ma_trend?: string;
   score_reasons?: string[];
+  rsi6?: number;
+  rsi12?: number;
+  volume_ratio?: number;
+  volume_signal?: string;
 }
 
 export interface Report {
@@ -70,6 +74,20 @@ export interface AskResponse {
   risks: string[];
   indicators: ReportIndicators;
   model?: string;
+  session_id?: string;
+  message_id?: number | null;
+  is_new_session?: boolean;
+  conversation_title?: string;
+}
+
+export interface AskMessage {
+  id: number;
+  role: string;
+  content: string;
+  answer_type?: string | null;
+  ai_status?: string | null;
+  model?: string | null;
+  created_at: string;
 }
 
 export interface RecordItem {
@@ -92,6 +110,7 @@ export interface RecordItem {
     task_id?: string;
   };
   created_at: string;
+  session_id?: string | null;
 }
 
 export interface RecordDetail {
@@ -115,6 +134,8 @@ export interface RecordDetail {
     task_id?: string;
   };
   created_at: string;
+  session_id?: string | null;
+  messages?: AskMessage[] | null;
 }
 
 export type RootTabParamList = {

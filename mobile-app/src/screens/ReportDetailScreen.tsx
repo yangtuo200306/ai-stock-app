@@ -150,6 +150,36 @@ export default function ReportDetailScreen() {
           </View>
         )}
 
+        {report.indicators?.rsi6 != null && (
+          <>
+            <Text style={styles.sectionTitle}>RSI</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>RSI(6)</Text>
+              <Text style={styles.value}>{report.indicators.rsi6}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>RSI(12)</Text>
+              <Text style={styles.value}>{report.indicators.rsi12}</Text>
+            </View>
+          </>
+        )}
+
+        {report.indicators?.volume_signal != null && (
+          <>
+            <Text style={styles.sectionTitle}>成交量</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>信号</Text>
+              <Text style={styles.value}>{report.indicators.volume_signal}</Text>
+            </View>
+            {report.indicators.volume_ratio != null && (
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>比值</Text>
+                <Text style={styles.value}>{report.indicators.volume_ratio}</Text>
+              </View>
+            )}
+          </>
+        )}
+
         {report.indicators?.score_reasons != null &&
           report.indicators.score_reasons.length > 0 && (
             <>

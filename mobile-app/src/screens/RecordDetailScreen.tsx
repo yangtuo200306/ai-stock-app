@@ -67,19 +67,44 @@ export default function RecordDetailScreen() {
           {record.stock_name}（{record.stock_code}）
         </Text>
 
-        {record.record_type === 'ask' && record.question ? (
-          <>
-            <Text style={styles.sectionTitle}>问题</Text>
-            <Text style={styles.questionText}>{record.question}</Text>
-          </>
+        {/* Messages for ask records with session */}
+        {record.record_type === 'ask' && record.messages && record.messages.length > 0 ? (
+          <View style={styles.messagesContainer}>
+            {record.messages.map((msg, index) => (
+              <View
+                key={`${msg.id}-${index}`}
+                style={[
+                  styles.messageBubble,
+                  msg.role === 'user' ? styles.userBubble : styles.assistantBubble,
+                ]}
+              >
+                <Text style={styles.messageRole}>
+                  {msg.role === 'user' ? '我' : msg.answer_type === 'ai' ? 'AI 回答' : '规则回退回答'}
+                </Text>
+                <Text style={styles.messageContent}>{msg.content}</Text>
+              </View>
+            ))}
+          </View>
         ) : null}
 
-        {record.record_type === 'ask' && record.answer ? (
+        {/* Fallback for old records without messages */}
+        {record.record_type === 'ask' && (!record.messages || record.messages.length === 0) ? (
           <>
-            <Text style={styles.sectionTitle}>
-              {record.answer_type === 'ai' ? 'AI 回答' : '规则回退回答'}
-            </Text>
-            <Text style={styles.answerText}>{record.answer}</Text>
+            {record.question ? (
+              <>
+                <Text style={styles.sectionTitle}>问题</Text>
+                <Text style={styles.questionText}>{record.question}</Text>
+              </>
+            ) : null}
+
+            {record.answer ? (
+              <>
+                <Text style={styles.sectionTitle}>
+                  {record.answer_type === 'ai' ? 'AI 回答' : '规则回退回答'}
+                </Text>
+                <Text style={styles.answerText}>{record.answer}</Text>
+              </>
+            ) : null}
           </>
         ) : null}
 
@@ -168,6 +193,35 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
     marginBottom: 16,
+  },
+  messagesContainer: {
+    marginBottom: 16,
+  },
+  messageBubble: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+  },
+  userBubble: {
+    backgroundColor: '#eff6ff',
+    alignSelf: 'flex-end',
+  },
+  assistantBubble: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignSelf: 'flex-start',
+  },
+  messageRole: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 4,
+  },
+  messageContent: {
+    fontSize: 14,
+    color: '#334155',
+    lineHeight: 22,
   },
   sectionTitle: {
     fontSize: 16,

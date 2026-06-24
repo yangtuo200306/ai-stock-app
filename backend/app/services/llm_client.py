@@ -46,6 +46,10 @@ def _build_prompt(
     bias_ma20 = indicators.get("bias_ma20", "-")
     ma_trend = indicators.get("ma_trend", "-")
     score_reasons = indicators.get("score_reasons", [])
+    rsi6 = indicators.get("rsi6", "-")
+    rsi12 = indicators.get("rsi12", "-")
+    volume_ratio = indicators.get("volume_ratio", "-")
+    volume_signal = indicators.get("volume_signal", "-")
 
     reasons_text = "；".join(score_reasons) if score_reasons else "无"
 
@@ -64,7 +68,11 @@ def _build_prompt(
         f"- 乖离率（MA5）：{bias_ma5}%\n"
         f"- 乖离率（MA10）：{bias_ma10}%\n"
         f"- 乖离率（MA20）：{bias_ma20}%\n"
-        f"- 均线趋势：{ma_trend}\n\n"
+        f"- 均线趋势：{ma_trend}\n"
+        f"- RSI(6)：{rsi6}\n"
+        f"- RSI(12)：{rsi12}\n"
+        f"- 成交量比值：{volume_ratio}\n"
+        f"- 成交量信号：{volume_signal}\n\n"
         f"## 规则分析结果\n"
         f"- 综合评分：{score}/100\n"
         f"- 评分原因：{reasons_text}\n"
@@ -80,7 +88,8 @@ def _build_prompt(
         f"3. 不给确定性买卖指令。\n"
         f"4. 回答末尾必须包含：仅供学习参考，不构成投资建议。\n"
         f"5. 风格简洁、清楚、适合新手理解。\n"
-        f"6. 先直接回答用户问题，再补充技术指标分析。"
+        f"6. 先直接回答用户问题，再补充技术指标分析。\n"
+        f"7. 当前会话围绕 {stock_name}（{stock_code}），如果用户问到其他股票，提示当前会话只分析该股票。"
     )
 
 
@@ -96,6 +105,7 @@ def ask_llm(
     risks: list[str],
     indicators: dict,
     question: str,
+    conversation_messages: list[dict] | None = None,
 ) -> str:
     api_key = _get_env("LLM_API_KEY")
     base_url = _get_env("LLM_BASE_URL")
@@ -116,12 +126,20 @@ def ask_llm(
         question=question,
     )
 
+    messages = [{"role": "system", "content": "你是股票分析助手。"}]
+
+    if conversation_messages:
+        for msg in conversation_messages:
+            messages.append({
+                "role": msg["role"],
+                "content": msg["content"],
+            })
+
+    messages.append({"role": "user", "content": prompt})
+
     payload = {
         "model": model,
-        "messages": [
-            {"role": "system", "content": "你是股票分析助手。"},
-            {"role": "user", "content": prompt},
-        ],
+        "messages": messages,
         "temperature": 0.7,
         "max_tokens": 1024,
     }

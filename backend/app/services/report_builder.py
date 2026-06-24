@@ -5,6 +5,8 @@ def _calculate_score(
     change_pct: float,
     bias_ma5: float,
     ma_trend: str,
+    rsi6: float,
+    volume_signal: str,
 ) -> int:
     score = 50
 
@@ -28,6 +30,16 @@ def _calculate_score(
         score -= 5
     elif -3 <= bias_ma5 <= 3:
         score += 5
+
+    # RSI 影响
+    if rsi6 > 70:
+        score -= 5
+
+    # 成交量影响
+    if volume_signal == "放量" and change_pct > 0:
+        score += 5
+    elif volume_signal == "放量" and change_pct < 0:
+        score -= 5
 
     return max(0, min(100, score))
 
@@ -55,16 +67,20 @@ def _build_summary(
     ma20: float,
     ma_trend: str,
     action: str,
+    rsi6: float,
+    volume_signal: str,
 ) -> str:
     return (
         f"基于实时行情和技术指标分析：{quote.name}（{quote.code}）"
         f"当前价 {quote.price}，涨跌幅 {quote.change_pct}%。"
         f"MA5 {ma5}，MA10 {ma10}，MA20 {ma20}，"
-        f"均线呈{ma_trend}。当前建议：{action}。"
+        f"均线呈{ma_trend}。"
+        f"RSI(6) {rsi6}，成交量{volume_signal}。"
+        f"当前建议：{action}。"
     )
 
 
-def _build_risks(quote: StockQuote, bias_ma5: float) -> list[str]:
+def _build_risks(quote: StockQuote, bias_ma5: float, rsi6: float, volume_signal: str, change_pct: float) -> list[str]:
     risks = [
         "行情数据来自第三方接口（efinance），仅供学习和参考",
         "技术指标基于历史行情计算，不能预测未来走势",
@@ -73,6 +89,16 @@ def _build_risks(quote: StockQuote, bias_ma5: float) -> list[str]:
     if abs(bias_ma5) > 8:
         risks.append("当前价格相对短期均线偏离较大，需注意短期波动风险")
 
+    if rsi6 > 70:
+        risks.append("RSI 偏高，短期可能存在过热风险")
+    elif 0 < rsi6 < 30:
+        risks.append("RSI 偏低，短期处于弱势区间")
+
+    if volume_signal == "放量" and change_pct < 0:
+        risks.append("放量下跌，市场抛压较大，需注意风险")
+    elif volume_signal == "放量" and change_pct > 0:
+        risks.append("放量上涨，市场关注度较高")
+
     return risks
 
 
@@ -80,6 +106,8 @@ def _build_score_reasons(
     change_pct: float,
     bias_ma5: float,
     ma_trend: str,
+    rsi6: float,
+    volume_signal: str,
 ) -> list[str]:
     reasons = []
 
@@ -104,6 +132,16 @@ def _build_score_reasons(
     elif bias_ma5 < -8:
         reasons.append("价格低于短期均线较多，存在反弹可能")
 
+    if rsi6 > 70:
+        reasons.append("RSI 偏高，短期需注意过热风险")
+    elif rsi6 < 30:
+        reasons.append("RSI 偏低，短期处于弱势区间")
+
+    if volume_signal == "放量":
+        reasons.append("成交量放大，市场关注度提升")
+    elif volume_signal == "缩量":
+        reasons.append("成交量萎缩，市场参与度降低")
+
     return reasons
 
 
@@ -118,13 +156,17 @@ def build_analysis_report(
     bias_ma10 = technicals["bias_ma10"]
     bias_ma20 = technicals["bias_ma20"]
     ma_trend = technicals["ma_trend"]
+    rsi6 = technicals["rsi6"]
+    rsi12 = technicals["rsi12"]
+    volume_ratio = technicals["volume_ratio"]
+    volume_signal = technicals["volume_signal"]
 
-    score = _calculate_score(quote.change_pct, bias_ma5, ma_trend)
+    score = _calculate_score(quote.change_pct, bias_ma5, ma_trend, rsi6, volume_signal)
     action = _determine_action(score)
     trend = _determine_trend(ma_trend)
-    summary = _build_summary(quote, ma5, ma10, ma20, ma_trend, action)
-    risks = _build_risks(quote, bias_ma5)
-    score_reasons = _build_score_reasons(quote.change_pct, bias_ma5, ma_trend)
+    summary = _build_summary(quote, ma5, ma10, ma20, ma_trend, action, rsi6, volume_signal)
+    risks = _build_risks(quote, bias_ma5, rsi6, volume_signal, quote.change_pct)
+    score_reasons = _build_score_reasons(quote.change_pct, bias_ma5, ma_trend, rsi6, volume_signal)
 
     indicators = {
         "change_pct": quote.change_pct,
@@ -138,6 +180,10 @@ def build_analysis_report(
         "bias_ma20": bias_ma20,
         "ma_trend": ma_trend,
         "score_reasons": score_reasons,
+        "rsi6": rsi6,
+        "rsi12": rsi12,
+        "volume_ratio": volume_ratio,
+        "volume_signal": volume_signal,
     }
 
     return {
