@@ -1,7 +1,12 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
+import { AppButton } from '../components/AppButton';
+import { AppCard } from '../components/AppCard';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 export default function LoginScreen() {
   const navigation = useNavigation();
@@ -49,7 +54,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
+      <AppCard style={styles.card}>
         <Text style={styles.title}>{mode === 'login' ? '登录' : '注册'}</Text>
 
         <TextInput
@@ -57,7 +62,7 @@ export default function LoginScreen() {
           value={username}
           onChangeText={setUsername}
           placeholder="用户名"
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor={colors.textSubtle}
           autoCapitalize="none"
           autoCorrect={false}
         />
@@ -67,7 +72,7 @@ export default function LoginScreen() {
           value={password}
           onChangeText={setPassword}
           placeholder="密码"
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor={colors.textSubtle}
           secureTextEntry
         />
 
@@ -77,35 +82,30 @@ export default function LoginScreen() {
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             placeholder="确认密码"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.textSubtle}
             secureTextEntry
           />
         )}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <Pressable
-          style={[styles.primaryButton, loading && styles.disabledButton]}
+        <AppButton
+          title={mode === 'login' ? '登录' : '注册'}
           onPress={handleSubmit}
+          loading={loading}
           disabled={loading}
-        >
-          <Text style={styles.primaryButtonText}>
-            {loading ? '处理中...' : mode === 'login' ? '登录' : '注册'}
-          </Text>
-        </Pressable>
+          style={styles.submitButton}
+        />
 
-        <Pressable
-          style={styles.switchButton}
+        <AppButton
+          title={mode === 'login' ? '没有账号？点击注册' : '已有账号？点击登录'}
+          variant="ghost"
           onPress={() => {
             setMode(mode === 'login' ? 'register' : 'login');
             setError('');
           }}
-        >
-          <Text style={styles.switchButtonText}>
-            {mode === 'login' ? '没有账号？点击注册' : '已有账号？点击登录'}
-          </Text>
-        </Pressable>
-      </View>
+        />
+      </AppCard>
     </View>
   );
 }
@@ -113,62 +113,37 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing.xxl,
   },
   card: {
-    width: '100%',
     maxWidth: 420,
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 24,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 24,
+    ...typography.pageTitle,
+    color: colors.textPrimary,
+    marginBottom: spacing.xxl,
     textAlign: 'center',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: colors.borderStrong,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.buttonHorizontal,
+    paddingVertical: spacing.buttonVertical,
     fontSize: 16,
-    color: '#0f172a',
-    marginBottom: 12,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
   },
-  primaryButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  disabledButton: {
-    backgroundColor: '#94a3b8',
-  },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  switchButton: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  switchButtonText: {
-    color: '#2563eb',
-    fontSize: 14,
+  submitButton: {
+    marginBottom: spacing.md,
   },
   errorText: {
-    color: '#dc2626',
-    fontSize: 14,
-    marginBottom: 12,
+    ...typography.helper,
+    color: colors.danger,
+    marginBottom: spacing.md,
     textAlign: 'center',
   },
 });

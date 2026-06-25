@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 import type { MineStackParamList } from '../types';
 import { STORAGE_KEYS } from '../api/client';
+import { AppButton } from '../components/AppButton';
+import { AppCard } from '../components/AppCard';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 type NavProp = NativeStackNavigationProp<MineStackParamList, 'Mine'>;
 
@@ -64,196 +69,128 @@ export default function MineScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>我的</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.title}>我的</Text>
 
+      <AppCard style={styles.card}>
+        <Text style={styles.sectionTitle}>账号</Text>
         {isLoggedIn ? (
-          <View style={styles.userSection}>
+          <View style={styles.sectionBody}>
             <Text style={styles.usernameText}>当前用户：{username}</Text>
-            <Pressable style={styles.logoutButton} onPress={logout}>
-              <Text style={styles.logoutButtonText}>退出登录</Text>
-            </Pressable>
+            <AppButton title="退出登录" variant="danger" onPress={logout} />
           </View>
         ) : (
-          <View style={styles.userSection}>
+          <View style={styles.sectionBody}>
             <Text style={styles.placeholder}>未登录</Text>
-            <Pressable
-              style={styles.loginButton}
-              onPress={() => navigation.navigate('Login')}
-            >
-              <Text style={styles.loginButtonText}>登录 / 注册</Text>
-            </Pressable>
+            <AppButton title="登录 / 注册" onPress={() => navigation.navigate('Login')} />
           </View>
         )}
+      </AppCard>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>应用信息</Text>
-          <Text style={styles.infoText}>当前版本：v0.5</Text>
-          <Text style={styles.infoText}>当前能力：最小用户系统</Text>
+      <AppCard style={styles.card}>
+        <Text style={styles.sectionTitle}>应用信息</Text>
+        <Text style={styles.infoText}>当前版本：v0.8</Text>
+        <Text style={styles.infoText}>当前能力：页面体验与公共 UI 基础</Text>
+      </AppCard>
+
+      <AppCard style={styles.card}>
+        <Text style={styles.sectionTitle}>后端地址配置</Text>
+
+        <TextInput
+          style={styles.input}
+          value={backendUrl}
+          onChangeText={setBackendUrl}
+          placeholder="http://127.0.0.1:8000"
+          placeholderTextColor={colors.textSubtle}
+          autoCapitalize="none"
+        />
+
+        <Text style={styles.example}>示例：http://127.0.0.1:8000</Text>
+
+        <View style={styles.buttonGroup}>
+          <AppButton title="保存地址" onPress={handleSave} />
+          <AppButton title="测试连接" variant="secondary" onPress={handleTestConnection} />
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>后端地址配置</Text>
-
-          <TextInput
-            style={styles.input}
-            value={backendUrl}
-            onChangeText={setBackendUrl}
-            placeholder="http://127.0.0.1:8000"
-            placeholderTextColor="#94a3b8"
-            autoCapitalize="none"
-          />
-
-          <Text style={styles.example}>示例：http://127.0.0.1:8000</Text>
-
-          <Pressable style={styles.primaryButton} onPress={handleSave}>
-            <Text style={styles.primaryButtonText}>保存地址</Text>
-          </Pressable>
-
-          <Pressable style={styles.secondaryButton} onPress={handleTestConnection}>
-            <Text style={styles.secondaryButtonText}>测试连接</Text>
-          </Pressable>
-
-          <Text style={styles.currentValue}>当前输入：{backendUrl || '暂未输入'}</Text>
-          <Text style={styles.savedValue}>已保存地址：{savedBackendUrl || '暂未保存'}</Text>
-          <Text style={styles.message}>操作提示：{message}</Text>
-        </View>
-      </View>
-    </View>
+        <Text style={styles.currentValue}>当前输入：{backendUrl || '暂未输入'}</Text>
+        <Text style={styles.savedValue}>已保存地址：{savedBackendUrl || '暂未保存'}</Text>
+        <Text style={styles.message}>操作提示：{message}</Text>
+      </AppCard>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
+    backgroundColor: colors.background,
   },
-  card: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 24,
+  content: {
+    padding: spacing.xxl,
+    gap: spacing.sectionGap,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 12,
+    ...typography.pageTitle,
+    color: colors.textPrimary,
     textAlign: 'center',
   },
-  userSection: {
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  usernameText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
-    marginBottom: 12,
-  },
-  placeholder: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 12,
-  },
-  loginButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  loginButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  logoutButton: {
-    backgroundColor: '#fee2e2',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  logoutButtonText: {
-    color: '#dc2626',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  section: {
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    paddingTop: 16,
-    marginTop: 16,
+  card: {
+    maxWidth: 420,
+    alignSelf: 'center',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 12,
+    ...typography.sectionTitle,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  sectionBody: {
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  usernameText: {
+    ...typography.bodyStrong,
+    color: colors.textPrimary,
+  },
+  placeholder: {
+    ...typography.body,
+    color: colors.textMuted,
   },
   infoText: {
-    fontSize: 14,
-    color: '#334155',
-    marginBottom: 8,
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: colors.borderStrong,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.buttonHorizontal,
+    paddingVertical: spacing.buttonVertical,
     fontSize: 16,
-    color: '#0f172a',
-    marginBottom: 8,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   example: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 16,
+    ...typography.helper,
+    color: colors.textMuted,
+    marginBottom: spacing.lg,
   },
-  primaryButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  secondaryButton: {
-    backgroundColor: '#e0f2fe',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  secondaryButtonText: {
-    color: '#0369a1',
-    fontSize: 16,
-    fontWeight: '700',
+  buttonGroup: {
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
   currentValue: {
-    fontSize: 14,
-    color: '#334155',
-    marginBottom: 8,
+    ...typography.helper,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
   savedValue: {
-    fontSize: 14,
-    color: '#334155',
-    marginBottom: 8,
+    ...typography.helper,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
   message: {
-    fontSize: 14,
-    color: '#2563eb',
+    ...typography.helper,
+    color: colors.primary,
   },
 });

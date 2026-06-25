@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
@@ -7,6 +7,14 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { apiGet } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import type { AnalysisTask, WatchlistStackParamList, RootTabParamList } from '../types';
+import { AppButton } from '../components/AppButton';
+import { AppCard } from '../components/AppCard';
+import { LoginRequiredView } from '../components/LoginRequiredView';
+import { StateView } from '../components/StateView';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
+import { getTaskStatusColor, getTaskStatusLabel } from '../utils/taskStatusDisplay';
 
 type RouteType = RouteProp<WatchlistStackParamList, 'TaskStatus'>;
 type NavProp = NativeStackNavigationProp<WatchlistStackParamList, 'TaskStatus'>;
@@ -21,7 +29,9 @@ export default function TaskStatusScreen() {
   const [task, setTask] = useState<AnalysisTask | null>(null);
   const [error, setError] = useState('');
 
-  const fetchTask = async () => {
+  const fetchTask = useCallback(async () => {
+    if (authLoading || !isLoggedIn) return;
+
     try {
       const data = await apiGet(`/api/analysis/${taskId}`);
       if (data.task_id) {
@@ -33,65 +43,30 @@ export default function TaskStatusScreen() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '查询任务状态失败');
     }
-  };
+  }, [authLoading, isLoggedIn, taskId]);
 
   useEffect(() => {
     fetchTask();
-  }, [taskId]);
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return '排队中';
-      case 'running':
-        return '分析中';
-      case 'completed':
-        return '已完成';
-      case 'failed':
-        return '失败';
-      default:
-        return status;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return '#f59e0b';
-      case 'running':
-        return '#3b82f6';
-      case 'completed':
-        return '#22c55e';
-      case 'failed':
-        return '#ef4444';
-      default:
-        return '#64748b';
-    }
-  };
+  }, [fetchTask]);
 
   if (authLoading) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.loadingText}>加载中...</Text>
-      </View>
-    );
+    return <StateView type="loading" />;
   }
 
   if (!isLoggedIn) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.loginTitle}>请先登录</Text>
-        <Text style={styles.loginDescription}>登录后可以使用自选、问股和记录功能。</Text>
-        <Pressable style={styles.loginButton} onPress={() => tabNavigation.navigate('我的', { screen: 'Login' })}>
-          <Text style={styles.loginButtonText}>去登录</Text>
-        </Pressable>
+        <LoginRequiredView
+          description="登录后可以使用自选、问股和记录功能。"
+          onLoginPress={() => tabNavigation.navigate('我的', { screen: 'Login' })}
+        />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
+      <AppCard style={styles.card}>
         <Text style={styles.title}>分析任务</Text>
         <Text style={styles.stockLabel}>股票代码：{stockCode}</Text>
 
@@ -99,31 +74,26 @@ export default function TaskStatusScreen() {
 
         {task ? (
           <View style={styles.statusSection}>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) }]}>
-              <Text style={styles.statusText}>{getStatusLabel(task.status)}</Text>
+            <View style={[styles.statusBadge, { backgroundColor: getTaskStatusColor(task.status) }]}>
+              <Text style={styles.statusText}>{getTaskStatusLabel(task.status)}</Text>
             </View>
             <Text style={styles.progressText}>进度：{task.progress}%</Text>
             <Text style={styles.messageText}>{task.message}</Text>
 
             {task.status === 'completed' && task.report_id ? (
-              <Pressable
-                style={styles.primaryButton}
-                onPress={() =>
-                  navigation.navigate('ReportDetail', { reportId: task.report_id! })
-                }
-              >
-                <Text style={styles.primaryButtonText}>查看报告</Text>
-              </Pressable>
+              <AppButton
+                title="查看报告"
+                onPress={() => navigation.navigate('ReportDetail', { reportId: task.report_id! })}
+                style={styles.reportButton}
+              />
             ) : null}
           </View>
         ) : (
-          <Text style={styles.loadingText}>加载中...</Text>
+          <StateView type="loading" title="加载中..." style={styles.inlineState} />
         )}
 
-        <Pressable style={styles.secondaryButton} onPress={fetchTask}>
-          <Text style={styles.secondaryButtonText}>刷新状态</Text>
-        </Pressable>
-      </View>
+        <AppButton title="刷新状态" variant="secondary" onPress={fetchTask} />
+      </AppCard>
     </View>
   );
 }
@@ -131,120 +101,68 @@ export default function TaskStatusScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
     alignItems: 'center',
-    padding: 24,
+    padding: spacing.xxl,
   },
   centerContainer: {
     flex: 1,
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: spacing.xxl,
   },
   card: {
-    width: '100%',
     maxWidth: 420,
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 24,
-    marginTop: 24,
+    marginTop: spacing.xxl,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 16,
+    ...typography.pageTitle,
+    color: colors.textPrimary,
+    marginBottom: spacing.lg,
     textAlign: 'center',
   },
   stockLabel: {
-    fontSize: 16,
-    color: '#475569',
-    marginBottom: 16,
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
     textAlign: 'center',
   },
   statusSection: {
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
   statusBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: 12,
   },
   statusText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
+    ...typography.bodyStrong,
+    color: colors.textInverse,
   },
   progressText: {
-    fontSize: 16,
-    color: '#1e293b',
+    ...typography.body,
+    color: colors.textPrimary,
   },
   messageText: {
-    fontSize: 14,
-    color: '#64748b',
+    ...typography.helper,
+    color: colors.textMuted,
     textAlign: 'center',
   },
-  loadingText: {
-    fontSize: 16,
-    color: '#475569',
-    textAlign: 'center',
-    marginVertical: 16,
+  inlineState: {
+    flex: 0,
+    paddingVertical: spacing.xl,
   },
   errorText: {
-    fontSize: 16,
-    color: '#dc2626',
+    ...typography.body,
+    color: colors.danger,
     textAlign: 'center',
-    marginVertical: 16,
+    marginVertical: spacing.lg,
   },
-  primaryButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  secondaryButton: {
-    backgroundColor: '#e0f2fe',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  secondaryButtonText: {
-    color: '#0369a1',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  loginTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  loginDescription: {
-    fontSize: 15,
-    color: '#64748b',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  loginButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  loginButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
+  reportButton: {
+    marginTop: spacing.sm,
+    minWidth: 140,
   },
 });
