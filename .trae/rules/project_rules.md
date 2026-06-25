@@ -2,25 +2,31 @@
 
 ## 1. 用户学习目标
 
-用户希望通过开发 AI Stock App 学习：
+用户已完成 v0.1 ~ v0.9 的基础学习阶段，已掌握：
 
-- 项目架构；
-- Python FastAPI 后端；
-- React Native 移动端；
-- SQLite 数据库；
-- Git 项目管理；
-- AI 协作开发
-用户当前更重视"理解为什么"，不是只追求快速写完功能。
+- Python FastAPI 后端开发（路由、鉴权、数据库、服务层）
+- React Native 移动端开发（导航、状态管理、组件抽离、自定义 Hook）
+- SQLite 数据库设计与迁移
+- Git 版本管理与迭代规划
+- AI 协作开发（计划 → 执行 → 审查）
+
+当前进入 **v1.0+ 进阶学习阶段**，重点方向：
+
+- 工程化与部署（生产环境构建、配置管理、日志、部署流程）
+- 状态管理升级（Zustand / TanStack Query）
+- 性能优化（缓存、分页、列表优化）
+- 测试（单元测试、组件测试）
+- AI 能力进阶（流式响应、Prompt 调优）
+用户仍重视"理解为什么"，但可以接受更深入的工程化讨论，不再需要从零开始的解释。
 
 ## 2. 用户学习偏好
 
 - 使用中文交流。
-- 解释要适合新手。
-- 节奏放慢，不要一次性推进太多。
-- 新概念优先用生活化类比。
+- 解释要清晰直接，不再需要从零开始的"新手解释"。
+- 新概念优先联系已掌握的知识，用工程类比说明。
 - 多互动，主动询问用户哪里不懂。
 - 鼓励用户用自己的话复述理解，并及时纠正。
-- 可以适当插入实用技巧、有趣知识、调试经验和项目经验。
+- 可以适当插入实用技巧、工程经验和进阶知识。
 - 聊天和学习概念时自然对话，不必过度严肃。
 - 涉及代码修改、文档写入、提交、推送时必须先确认。
 
@@ -72,12 +78,11 @@ d:/ai-stock-analysis/stock-analysis-reference
 - `stock-analysis-reference` 只读参考，不修改、不提交。
 - `ai-stock-app` 是用户自己的项目。
 - `backend/` 放后端代码。
-- `mobile-app/` 后续放移动端代码。
-- `docs/learning-plan.md` 是学习计划，不要重复复制它的内容。
-- `docs/backend-learning-notes.md` 是后端学习笔记。
-- `docs/frontend-learning-notes.md` 是前端学习笔记。
+- `mobile-app/` 放移动端代码。
+- `docs/README.md` 是项目总览。
 - `docs/code-review-notes.md` 是代码问题隐患记录。
 - `docs/common-issues.md` 是常见问题与排查手册。
+- `docs/archive/` 是历史文档归档。
 - `.trae/rules/project_rules.md` 是 AI 协作规则文件。
 
 ## 6. 当前项目事实
@@ -100,29 +105,18 @@ d:/ai-stock-analysis/stock-analysis-reference
 - 第五阶段：历史报告列表 + 新导航结构（自选 | 问股 | 报告 | 我的）
 - v0.4：用户边界 + 问股闭环（默认 user_id、records 表、问股/自选写入记录、报告 Tab 改为记录）
 - v0.5：最小用户系统（注册、登录、退出登录、token 鉴权、用户数据隔离、统一 API client）
+- v0.6：AI 助手能力增强（多轮追问、股票简称识别、技术指标增强、记录详情）
+- v0.7：功能定型（新建会话、继续追问、自选摘要、报告类型、API 错误结构初步统一）
+- v0.8：页面体验与公共 UI 基础（公共组件、主题常量、统一状态展示、未登录引导）
+- v0.9：状态管理与稳定性（刷新信号层、结构化 ApiError、统一 401 处理、任务轮询、登录联动刷新）
 
 当前版本状态：
 
-- v0.1 AI Stock App MVP 已完成并通过手动验收。
-- v0.1 总结文档已生成：`docs/releases/v0.1-summary.md`。
-- v0.2 计划文档已生成：`docs/plans/v0.2-plan.md`。
-- v0.2 基础分析增强版已完成并通过整体审查。
-- v0.2 总结文档已生成：`docs/releases/v0.2-summary.md`。
-- v0.2 功能提交：`bab6aa0 feat: add v0.2 ask and mine flows`。
-- v0.2 文档总结提交：`c339b96 docs: summarize v0.2 completion`。
-- v0.2 已推送远程。
-- v0.3 计划文档已生成：`docs/plans/v0.3-plan.md`。
-- v0.3 AI 问股可用版已完成、提交并 push。
-- v0.3 最新提交：`0a106e4 feat: add v0.3 market fallback and ai ask`。
-- v0.3 总结文档已生成：`docs/releases/v0.3-summary.md`。
-- v0.3 已完成 efinance 主源 + 新浪实时行情/历史 K 线 fallback。
-- v0.3 已完成问股问题输入、6 位 A 股代码提取、火山方舟 DeepSeek Endpoint AI 回答和规则回退。
-- v0.3 Web 手动验收已通过：输入“000001 怎么看？”可以返回 AI 回答、行情摘要、技术指标和风险提示。
-- 产品总路线文档已生成：`docs/plans/product-roadmap.md`。
-- v0.4 用户边界 + 问股闭环 ✅ 已完成（详见 `docs/releases/v0.4-summary.md`）。
-- v0.5 最小用户系统 ✅ 已完成（详见 `docs/releases/v0.5-summary.md`）。
-- v0.5 已完成注册、登录、退出登录、`/api/auth/me`、token 鉴权和用户数据隔离。
-- 后续总路线：v0.6 AI 助手能力增强，v0.7 功能定型，v0.8 UI/UX 集中优化。
+- v0.1 ~ v0.9 已完成，共 9 个版本迭代。
+- 所有版本计划文档和总结文档均已生成。
+- v0.9 已提交并 push 到远程。
+- 当前产品已具备自用最小稳定版能力。
+- 下一阶段目标：v1.0 部署准备与自用测试版（工程化进阶）。
 
 当前后端结构：
 
@@ -149,6 +143,8 @@ backend/
       technical_indicators.py
       report_builder.py
       llm_client.py
+      ask_service.py
+      stock_resolver.py
 ```
 
 当前移动端结构：
@@ -161,6 +157,9 @@ mobile-app/
       client.ts
     contexts/
       AuthContext.tsx
+      DataRefreshContext.tsx
+    hooks/
+      useApiErrorHandler.ts
     navigation/
       AppNavigator.tsx
       WatchlistStackNavigator.tsx
@@ -168,15 +167,28 @@ mobile-app/
       MineStackNavigator.tsx
     screens/
       WatchlistScreen.tsx
-      SettingsScreen.tsx
       AskScreen.tsx
-      MarketScreen.tsx
       TaskStatusScreen.tsx
       ReportDetailScreen.tsx
       RecordListScreen.tsx
       RecordDetailScreen.tsx
       MineScreen.tsx
       LoginScreen.tsx
+    components/
+      AppButton.tsx
+      AppCard.tsx
+      StateView.tsx
+      LoginRequiredView.tsx
+      MessageBubble.tsx
+      MetricRow.tsx
+    theme/
+      colors.ts
+      spacing.ts
+      typography.ts
+    utils/
+      stockDisplay.ts
+      recordDisplay.ts
+      taskStatusDisplay.ts
     types/
       index.ts
 ```
@@ -194,11 +206,10 @@ mobile-app/
 
 - 不擅自创建或修改文档。
 - 创建/修改文档前先询问用户。
-- `docs/learning-plan.md` 只作为学习计划。
-- `docs/backend-learning-notes.md` 记录实际学到的后端知识。
-- `docs/frontend-learning-notes.md` 记录实际学到的前端知识。
+- `docs/README.md` 项目总览，包含快速启动、技术栈、版本历史。
 - `docs/code-review-notes.md` 记录代码阅读中发现的问题和隐患。
 - `docs/common-issues.md` 记录多次出现的常见问题和排查方式。
+- `docs/archive/` 历史文档归档，包含 v0.1~v0.9 的计划、总结和学习笔记。
 - `.trae/rules/project_rules.md` 记录 AI 协作规则和项目上下文。
 
 ## 9. 复习与学习目标规划
@@ -208,19 +219,29 @@ mobile-app/
 
 ## 10. 长期学习目标
 
+### 已完成的基础能力
+
 - AI 协作开发能力：学习如何描述需求、限制修改范围、让 AI 先计划再执行、审查 AI 输出，并用 Git 保护项目。
-- AI 协作开发能力升级：学习上下文工程、代码库检索、MCP、Skill、Agent 工作流、测试验证和权限边界；后续由 AI 在合适节点主动提示相关知识。
 - 后端调试能力：学习如何分析 404、500、端口占用、旧服务未重启、依赖缺失等问题。
 - API 设计思维：学习接口命名、请求方法选择、返回结构设计、错误信息设计，以及 mock 到真实数据的演进。
 - 项目化学习能力：坚持小步闭环、验证、提交、记录，逐步理解真实项目开发流程。
 - 代码阅读能力：训练用户用自己的话解释代码，理解 import、函数、router、main.py、报错信息等内容。
+
+### v1.0+ 进阶学习目标
+
+- **工程化与部署**：生产环境构建、环境变量管理、日志系统、部署流程、数据库备份策略。
+- **状态管理升级**：Zustand / TanStack Query 的设计思想、Store 拆分、缓存策略、乐观更新。
+- **性能优化**：列表虚拟化、缓存策略、页面渲染优化、网络请求优化。
+- **测试**：后端接口测试、前端组件测试、端到端测试。
+- **AI 能力进阶**：流式响应、Prompt 工程、多轮对话上下文管理、多模型切换。
+- **AI 协作开发能力升级**：上下文工程、代码库检索、MCP、Skill、Agent 工作流、测试验证和权限边界。
 
 ## 11. 下次对话启动方式
 
 新对话开始时，AI 应优先参考：
 
 1. `.trae/rules/project_rules.md` — 协作规则和项目事实
-2. `docs/learning-plan.md` — 当前阶段和下一步
-3. `docs/code-review-notes.md` — 待修复问题清单
+2. `docs/code-review-notes.md` — 待修复问题清单
+3. `docs/README.md` — 项目总览
 
 然后先确认用户当前想做什么，再按对应模式工作。
