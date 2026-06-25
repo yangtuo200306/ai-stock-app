@@ -1,9 +1,10 @@
-import os
+import logging
 
 import requests
-from dotenv import load_dotenv
 
-load_dotenv()
+from app.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 class LlmError(Exception):
@@ -18,11 +19,14 @@ class LlmApiError(LlmError):
     pass
 
 
-def _get_env(key: str) -> str:
-    value = os.environ.get(key)
-    if not value:
-        raise LlmConfigError(f"环境变量 {key} 未配置")
-    return value.strip()
+def _get_llm_config():
+    if not settings.LLM_API_KEY:
+        raise LlmConfigError("环境变量 LLM_API_KEY 未配置")
+    if not settings.LLM_BASE_URL:
+        raise LlmConfigError("环境变量 LLM_BASE_URL 未配置")
+    if not settings.LLM_MODEL:
+        raise LlmConfigError("环境变量 LLM_MODEL 未配置")
+    return settings.LLM_API_KEY, settings.LLM_BASE_URL, settings.LLM_MODEL
 
 
 def _build_prompt(
@@ -107,9 +111,7 @@ def ask_llm(
     question: str,
     conversation_messages: list[dict] | None = None,
 ) -> str:
-    api_key = _get_env("LLM_API_KEY")
-    base_url = _get_env("LLM_BASE_URL")
-    model = _get_env("LLM_MODEL")
+    api_key, base_url, model = _get_llm_config()
 
     url = f"{base_url.rstrip('/')}/chat/completions"
     prompt = _build_prompt(
@@ -149,18 +151,24 @@ def ask_llm(
         "Content-Type": "application/json",
     }
 
+    logger.info("LLM 请求开始: model=%s", model)
     try:
         resp = requests.post(url, json=payload, headers=headers, timeout=60)
         resp.raise_for_status()
         data = resp.json()
     except requests.Timeout as error:
+        logger.error("LLM 请求超时: model=%s", model)
         raise LlmApiError("大模型请求超时，请稍后重试") from error
     except requests.RequestException as error:
+        logger.error("LLM 请求失败: model=%s, error=%s", model, error)
         raise LlmApiError(f"大模型请求失败：{error}") from error
 
     try:
         content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as error:
+        logger.error("LLM 返回格式异常: %s", error)
         raise LlmApiError("大模型返回格式异常") from error
 
+    logger.info("LLM 请求成功: model=%s, tokens=%s",
+                model, data.get("usage", {}).get("total_tokens", "N/A"))
     return content.strip()

@@ -1,6 +1,7 @@
+import logging
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, field_validator
 import re
 
@@ -10,6 +11,9 @@ from app.database import (
     get_connection,
     get_current_user_id,
 )
+from app.errors import ErrorCode, api_error
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -49,10 +53,8 @@ def register(body: RegisterCreate):
         ).fetchone()
 
         if existing:
-            raise HTTPException(
-                status_code=400,
-                detail={"error_code": "USERNAME_EXISTS", "message": "用户名已存在"},
-            )
+            logger.warning("注册失败，用户名已存在: %s", body.username)
+            raise api_error(400, ErrorCode.USERNAME_EXISTS, "用户名已存在")
 
         password_hash, password_salt = _hash_password(body.password)
         cursor = connection.execute(
@@ -67,6 +69,7 @@ def register(body: RegisterCreate):
             (user_id, token),
         )
 
+    logger.info("用户注册成功: id=%s, username=%s", user_id, body.username)
     return {
         "message": "register success",
         "user_id": user_id,
@@ -84,16 +87,12 @@ def login(body: LoginCreate):
         ).fetchone()
 
         if row is None:
-            raise HTTPException(
-                status_code=401,
-                detail={"error_code": "INVALID_CREDENTIALS", "message": "用户名或密码错误"},
-            )
+            logger.warning("登录失败，用户不存在: %s", body.username)
+            raise api_error(401, ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误")
 
         if not _verify_password(body.password, row["password_hash"], row["password_salt"]):
-            raise HTTPException(
-                status_code=401,
-                detail={"error_code": "INVALID_CREDENTIALS", "message": "用户名或密码错误"},
-            )
+            logger.warning("登录失败，密码错误: %s", body.username)
+            raise api_error(401, ErrorCode.INVALID_CREDENTIALS, "用户名或密码错误")
 
         token = str(uuid4())
         connection.execute(
@@ -101,6 +100,7 @@ def login(body: LoginCreate):
             (row["id"], token),
         )
 
+    logger.info("用户登录成功: id=%s, username=%s", row["id"], body.username)
     return {
         "message": "login success",
         "user_id": row["id"],
@@ -121,6 +121,7 @@ def logout(
             (token, user_id),
         )
 
+    logger.info("用户退出登录: id=%s", user_id)
     return {"message": "logout success"}
 
 
@@ -133,7 +134,7 @@ def get_me(user_id: str = Depends(get_current_user_id)):
         ).fetchone()
 
     if row is None:
-        raise HTTPException(status_code=404, detail={"error_code": "USER_NOT_FOUND", "message": "用户不存在"})
+        raise api_error(404, ErrorCode.USER_NOT_FOUND, "用户不存在")
 
     return {
         "user_id": row["id"],

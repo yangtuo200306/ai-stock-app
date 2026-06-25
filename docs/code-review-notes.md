@@ -1287,6 +1287,33 @@
 - 当前是否需要立即修：否，v0.8 未调整导航结构。
 - 后续建议：后续抽出统一的 `ReportDetailParams` 类型。
 
+## 问题 143：analysis.py 存在重复 "message" key（已修复）
+
+- 位置：`backend/app/api/analysis.py`
+- 类型：代码实现 bug
+- 现象：第 72 行 `"message": "analysis task failed"` 被第 79 行 `"message": failed_message` 覆盖，实际返回的 `message` 是行情错误详情而非预期的 `"analysis task failed"`。
+- 影响：前端收到的错误 message 语义不准确。
+- 当前状态：已在 v1.0 1B 中修复（统一改为抛 HTTPException）。
+- 后续建议：保持使用统一错误处理方式，避免 dict 中重复 key。
+
+## 问题 144：数据库默认路径变更可能导致现有数据丢失（已注意）
+
+- 位置：`backend/app/config/settings.py`、`backend/app/database.py`
+- 类型：配置迁移隐患
+- 现象：`settings.py` 中默认路径曾设为 `Path("data/ai_stock.db")`，但原硬编码路径为 `ai_stock.db`（直接在 backend 目录下），启动时报 `unable to open database file`。
+- 影响：如果未及时发现，现有数据库文件不会被使用，数据看似"丢失"。
+- 当前状态：已立即改回 `ai_stock.db` 保持兼容。
+- 后续建议：改配置默认值时，先确认现有数据库文件位置，避免破坏现有数据。
+
+## 问题 145：python-dotenv 作为间接依赖仍需保留
+
+- 位置：`backend/requirements.txt`
+- 类型：依赖管理说明
+- 现象：引入 `pydantic-settings` 后不再手动调用 `load_dotenv()`，但 `pydantic-settings` 底层依赖 `python-dotenv` 解析 `.env` 文件。
+- 影响：如果从 `requirements.txt` 移除 `python-dotenv`，`pydantic-settings` 仍能通过自身依赖安装它，但显式保留更清晰。
+- 当前状态：已保留在 `requirements.txt` 中。
+- 后续建议：保持显式依赖声明，便于理解项目依赖关系。
+
 ## 问题 135：部分状态问题已通过 v0.8 统一展示，但底层状态管理仍未解决
 
 - 位置：`mobile-app/src/screens/*`、`mobile-app/src/contexts/AuthContext.tsx`、`mobile-app/src/api/client.ts`

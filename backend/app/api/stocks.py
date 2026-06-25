@@ -1,7 +1,11 @@
+import logging
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.database import get_current_user_id, get_connection
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["stocks"])
 
@@ -65,6 +69,7 @@ def add_stock(stock: StockCreate, user_id: str = Depends(get_current_user_id)):
             (stock.code, stock.name, user_id),
         )
 
+    logger.info("添加自选: user=%s, code=%s, name=%s", user_id, stock.code, stock.name)
     return {
         "message": "stock added",
         "item": item,
@@ -80,11 +85,13 @@ def delete_stock(code: str, user_id: str = Depends(get_current_user_id)):
         )
 
     if cursor.rowcount > 0:
+        logger.info("删除自选: user=%s, code=%s", user_id, code)
         return {
             "message": "stock deleted",
             "code": code,
         }
 
+    logger.warning("删除自选失败，未找到: user=%s, code=%s", user_id, code)
     return {
         "message": "stock not found",
         "code": code,

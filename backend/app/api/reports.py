@@ -1,14 +1,19 @@
 import json
+import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from app.database import get_current_user_id, get_connection
+from app.errors import ErrorCode, api_error
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["reports"])
 
 
 @router.get("/reports")
 def get_reports(user_id: str = Depends(get_current_user_id)):
+    logger.debug("查询报告列表: user=%s", user_id)
     with get_connection() as connection:
         rows = connection.execute(
             """
@@ -45,6 +50,7 @@ def get_reports(user_id: str = Depends(get_current_user_id)):
 
 @router.get("/reports/{report_id}")
 def get_report(report_id: int, user_id: str = Depends(get_current_user_id)):
+    logger.debug("查询报告详情: id=%s, user=%s", report_id, user_id)
     with get_connection() as connection:
         row = connection.execute(
             """
@@ -57,10 +63,7 @@ def get_report(report_id: int, user_id: str = Depends(get_current_user_id)):
         ).fetchone()
 
     if row is None:
-        raise HTTPException(
-            status_code=404,
-            detail={"error_code": "REPORT_NOT_FOUND", "message": "报告不存在"},
-        )
+        raise api_error(404, ErrorCode.REPORT_NOT_FOUND, "报告不存在")
 
     return {
         "id": row["id"],

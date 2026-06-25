@@ -1,9 +1,9 @@
-import os
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from app.config.settings import settings
 from app.database import get_current_user_id
+from app.errors import ErrorCode, api_error
 from app.services.ask_service import (
     _build_rule_answer,
     _build_conversation_title,
@@ -56,16 +56,15 @@ def _extract_stock_code(text: str) -> str | None:
 
 @router.post("/ask", response_model=AskResponse)
 def ask_stock(ask: AskCreate, user_id: str = Depends(get_current_user_id)):
+    logger.info("问股请求: session=%s, stock=%s, question=%.40s",
+                 ask.session_id, ask.stock_code, ask.question or "")
     # --- resolve session ---
     session = None
     is_new_session = False
     if ask.session_id:
         session = _get_ask_session(ask.session_id, user_id)
         if session is None:
-            raise HTTPException(
-                status_code=400,
-                detail={"error_code": "SESSION_NOT_FOUND", "message": "会话不存在"},
-            )
+            raise api_error(400, ErrorCode.SESSION_NOT_FOUND, "会话不存在")
 
     # --- resolve stock code ---
     stock_code = None
@@ -73,33 +72,26 @@ def ask_stock(ask: AskCreate, user_id: str = Depends(get_current_user_id)):
         stock_code = session["stock_code"]
         requested_stock_code = _extract_stock_code(ask.question or "")
         if requested_stock_code and requested_stock_code != stock_code:
-            raise HTTPException(
-                status_code=400,
-                detail={"error_code": "SESSION_STOCK_MISMATCH", "message": f"当前会话围绕 {session['stock_name']}（{stock_code}），如需分析其他股票请新开问题"},
-            )
+            raise api_error(400, ErrorCode.SESSION_STOCK_MISMATCH,
+                             f"当前会话围绕 {session['stock_name']}（{stock_code}），如需分析其他股票请新开问题")
     elif ask.stock_code:
         stock_code = ask.stock_code.strip()
     elif ask.question:
         extracted = _extract_stock_code(ask.question)
         if not extracted:
             supported = "、".join(get_supported_names())
-            raise HTTPException(
-                status_code=400,
-                detail={"error_code": "STOCK_NOT_FOUND", "message": f"问题中未找到 6 位股票代码或已支持的股票名称（当前支持：{supported}），请提供例如：600519 怎么看？"},
-            )
+            raise api_error(400, ErrorCode.STOCK_NOT_FOUND,
+                             f"问题中未找到 6 位股票代码或已支持的股票名称（当前支持：{supported}），请提供例如：600519 怎么看？")
         stock_code = extracted
     else:
-        raise HTTPException(
-            status_code=400,
-            detail={"error_code": "MISSING_STOCK_CODE", "message": "请提供股票代码或包含股票代码的问题"},
-        )
+        raise api_error(400, ErrorCode.MISSING_STOCK_CODE, "请提供股票代码或包含股票代码的问题")
 
     # --- fetch market data ---
     try:
         quote = get_stock_quote(stock_code)
         history = get_stock_history(stock_code)
     except MarketDataError as error:
-        raise HTTPException(status_code=400, detail={"error_code": "MARKET_DATA_ERROR", "message": str(error)}) from error
+        raise api_error(400, ErrorCode.MARKET_DATA_ERROR, str(error)) from error
 
     technicals = build_technical_indicators(quote.price, history)
     report = build_analysis_report(quote, technicals)
@@ -107,7 +99,7 @@ def ask_stock(ask: AskCreate, user_id: str = Depends(get_current_user_id)):
     # --- generate answer ---
     answer_type = "rule"
     ai_status = "fallback"
-    model_name = os.environ.get("LLM_MODEL")
+    model_name = settings.LLM_MODEL or None
     answer = _build_rule_answer(report)
 
     try:
@@ -133,7 +125,7 @@ def ask_stock(ask: AskCreate, user_id: str = Depends(get_current_user_id)):
         ai_status = "ok"
         answer = ai_answer
     except LlmError:
-        pass
+        logger.warning("LLM 调用失败，降级为规则回答: stock=%s", stock_code)
 
     # --- save session & messages ---
     if session:

@@ -1,7 +1,10 @@
 import json
+import logging
 from uuid import uuid4
 
 from app.database import get_connection
+
+logger = logging.getLogger(__name__)
 
 
 def _build_rule_answer(report: dict) -> str:
@@ -22,6 +25,7 @@ def _create_ask_session(
     question: str, answer: str, answer_type: str, ai_status: str, model: str | None,
 ) -> str:
     session_id = str(uuid4())
+    logger.debug("创建会话: session=%s, user=%s, stock=%s", session_id, user_id, stock_code)
     with get_connection() as connection:
         connection.execute(
             """

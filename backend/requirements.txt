@@ -3,3 +3,4 @@ uvicorn
 efinance
 requests
 python-dotenv
+pydantic-settings

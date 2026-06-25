@@ -46,7 +46,11 @@ ai-stock-app/
 ├── backend/           # Python FastAPI 后端
 │   ├── app/
 │   │   ├── api/       # 接口层
-│   │   └── services/  # 服务层
+│   │   ├── services/  # 服务层
+│   │   ├── config/    # 配置管理（settings.py）
+│   │   ├── errors.py  # 错误码枚举
+│   │   ├── error_handler.py  # 全局异常处理器
+│   │   └── logging_config.py # 日志系统
 │   └── requirements.txt
 ├── mobile-app/        # React Native 移动端
 │   └── src/
@@ -80,10 +84,10 @@ ai-stock-app/
 | v0.7 | 新建会话、继续追问、自选摘要、报告类型 |
 | v0.8 | 公共 UI 组件、主题系统、统一状态展示 |
 | v0.9 | 刷新信号层、结构化 ApiError、统一 401 处理、任务轮询 |
-| v1.0 | Zustand 状态管理、类型拆分、DataRefreshContext 移除 |
+| v1.0 | 阶段一架构升级：前端 Zustand 状态管理 + 后端配置/日志/错误码/数据库迁移 |
 
 ## 文档索引
 
-- [代码问题与隐患记录](code-review-notes.md) — 已发现的 142 个问题及状态汇总
+- [代码问题与隐患记录](code-review-notes.md) — 已发现的 145 个问题及状态汇总
 - [常见问题与排查手册](common-issues.md) — 开发中反复遇到的问题及解决方式
 - [历史文档归档](archive/) — v0.1~v0.9 的计划、总结和学习笔记

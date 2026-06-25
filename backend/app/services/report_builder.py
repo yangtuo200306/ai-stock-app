@@ -1,4 +1,8 @@
+import logging
+
 from app.services.market_data import StockQuote
+
+logger = logging.getLogger(__name__)
 
 
 def _calculate_score(
@@ -186,6 +190,8 @@ def build_analysis_report(
         "volume_signal": volume_signal,
     }
 
+    logger.debug("报告构建完成: %s(%s), score=%s, action=%s",
+                 quote.code, quote.name, score, action)
     return {
         "stock_code": quote.code,
         "stock_name": quote.name,

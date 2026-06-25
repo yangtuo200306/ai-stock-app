@@ -57,7 +57,7 @@ mobile-app/src/
 
 ---
 
-### 子阶段 1B：后端架构升级
+### 子阶段 1B：后端架构升级 ✅ 已完成
 
 **范围：** `backend/app/`
 
@@ -65,35 +65,52 @@ mobile-app/src/
 
 ```
 backend/app/
-  config/settings.py      → 新增
-  logging_config.py       → 新增
+  config/
+    __init__.py           → 新增
+    settings.py           → 新增（pydantic-settings 集中管理 10 项配置）
+  logging_config.py       → 新增（控制台 + 文件轮转三级输出）
+  errors.py               → 新增（13 个 ErrorCode 枚举 + 辅助函数）
+  error_handler.py        → 新增（全局异常处理器）
+  main.py                 → 引入 settings/logging/error_handler
+  database.py             → 版本化迁移（schema_version 表 + 3 个版本）
   api/
-    ask.py                → 移除 os.environ.get
+    ask.py                → 移除 os.environ.get，替换 error_code
+    auth.py               → 替换 error_code + 日志
+    analysis.py           → 替换 error_code + 日志 + 修复重复 key bug
+    stocks.py             → 日志
+    records.py            → 替换 error_code + 日志
+    reports.py            → 替换 error_code + 日志
+    market.py             → 替换 error_code + 日志
   services/
-    llm_client.py         → 移除 os.environ.get
+    llm_client.py         → 移除 load_dotenv，改用 settings
     market_data.py        → 使用 settings
-  database.py             → 迁移机制
+    ask_service.py        → 日志
+    report_builder.py     → 日志
+  requirements.txt        → 新增 pydantic-settings
+  .env.example            → 补充所有配置项
 ```
 
 **按顺序执行：**
 
 | 步骤 | 内容 | 说明 |
 |------|------|------|
-| 1 | 配置管理 | 抽 `settings.py`，集中管理所有环境变量 |
-| 2 | 日志系统 | 分级日志、文件轮转、统一格式 |
-| 3 | 错误码体系 | 后端统一 `error_code` + 错误中间件 |
-| 4 | 数据库迁移 | 版本化迁移机制 |
+| 1 | 配置管理 | 抽 `settings.py`，集中管理 10 项配置 |
+| 2 | 日志系统 | 12 个文件添加日志，三级输出 + 文件轮转 |
+| 3 | 错误码体系 | 13 个枚举 + 全局异常处理器，替换 17 处字符串 |
+| 4 | 数据库迁移 | schema_version 表 + 3 个版本化迁移 |
 
 **不做：**
 - 不改数据库引擎（继续 SQLite）
 - 不改 API 路由结构
 - 不加新接口
 
-**完成后效果：**
-- 所有配置在一个文件管理
-- 出问题有日志可查
-- 前端能根据 error_code 做差异化处理
-- 改表结构有版本记录
+**完成后效果（已验证）：**
+- ✅ 所有配置在一个文件管理，类型安全
+- ✅ 出问题有日志可查（控制台 + 文件轮转）
+- ✅ 前端能根据 error_code 做差异化处理
+- ✅ 改表结构有版本记录
+- ✅ 全局异常处理器兜底未预期错误
+- ✅ 前后端编译零错误，核心链路验证通过
 
 ---
 
@@ -187,13 +204,12 @@ backend/app/
 
 | 总体方案 | 版本号 | 状态 |
 |---------|--------|------|
-| 阶段一 1A（前端架构升级） | v1.0 | ✅ 已完成 |
-| 阶段一 1B（后端架构升级） | v1.1 | ⏳ 待开始 |
-| 阶段二（问股页精修） | v1.2 | 📅 |
-| 阶段二（自选页精修） | v1.3 | 📅 |
-| 阶段二（记录页精修） | v1.4 | 📅 |
-| 阶段二（我的页精修） | v1.5 | 📅 |
-| 阶段三（工程化与部署） | v1.6 | 📅 |
+| 阶段一（前端+后端架构升级） | v1.0 | ✅ 已完成 |
+| 阶段二（问股页精修） | v1.1 | 📅 |
+| 阶段二（自选页精修） | v1.2 | 📅 |
+| 阶段二（记录页精修） | v1.3 | 📅 |
+| 阶段二（我的页精修） | v1.4 | 📅 |
+| 阶段三（工程化与部署） | v1.5 | 📅 |
 
 > 版本号仅为示意，具体每个版本做多少、版本号怎么定，由你决定。
 

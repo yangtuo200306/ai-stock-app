@@ -1,14 +1,19 @@
 import json
+import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from app.database import get_current_user_id, get_connection
+from app.errors import ErrorCode, api_error
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["records"])
 
 
 @router.get("/records")
 def get_records(user_id: str = Depends(get_current_user_id)):
+    logger.debug("查询记录列表: user=%s", user_id)
     with get_connection() as connection:
         rows = connection.execute(
             """
@@ -47,6 +52,7 @@ def get_records(user_id: str = Depends(get_current_user_id)):
 
 @router.get("/records/{record_id}")
 def get_record(record_id: int, user_id: str = Depends(get_current_user_id)):
+    logger.debug("查询记录详情: id=%s, user=%s", record_id, user_id)
     with get_connection() as connection:
         row = connection.execute(
             """
@@ -60,10 +66,7 @@ def get_record(record_id: int, user_id: str = Depends(get_current_user_id)):
         ).fetchone()
 
     if row is None:
-        raise HTTPException(
-            status_code=404,
-            detail={"error_code": "RECORD_NOT_FOUND", "message": "记录不存在"},
-        )
+        raise api_error(404, ErrorCode.RECORD_NOT_FOUND, "记录不存在")
 
     metadata = json.loads(row["metadata_json"]) if row["metadata_json"] else {}
 

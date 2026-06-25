@@ -1,13 +1,17 @@
+import logging
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 
 import efinance as ef
 import requests
 
+from app.config.settings import settings
 
-QUOTE_CACHE_TTL_SECONDS = 60
-PRIMARY_MARKET_SOURCE = "efinance"
-FALLBACK_MARKET_SOURCE = "sina"
+logger = logging.getLogger(__name__)
+
+QUOTE_CACHE_TTL_SECONDS = settings.QUOTE_CACHE_TTL_SECONDS
+PRIMARY_MARKET_SOURCE = settings.PRIMARY_MARKET_SOURCE
+FALLBACK_MARKET_SOURCE = settings.FALLBACK_MARKET_SOURCE
 _quote_cache: dict[str, tuple["StockQuote", datetime]] = {}
 
 SINA_QUOTE_URL = "https://hq.sinajs.cn/list={symbol}"
@@ -222,14 +226,17 @@ def get_stock_quote(code: str) -> StockQuote:
     if cached:
         cached_quote, cached_at = cached
         if now - cached_at <= timedelta(seconds=QUOTE_CACHE_TTL_SECONDS):
+            logger.debug("行情缓存命中: %s", stock_code)
             return cached_quote
 
     try:
         quote = _get_stock_quote_from_efinance(stock_code, now)
         _quote_cache[stock_code] = (quote, now)
+        logger.info("行情获取成功: %s, source=%s", stock_code, PRIMARY_MARKET_SOURCE)
         return quote
     except MarketDataError as primary_error:
-        pass
+        logger.warning("主行情源失败，切换备用: stock=%s, error=%s",
+                       stock_code, primary_error)
 
     try:
         quote = _get_stock_quote_from_fallback(stock_code, now)

@@ -125,17 +125,24 @@ d:/ai-stock-analysis/stock-analysis-reference
 - v0.9 已提交并 push 到远程。
 - 当前产品已具备自用最小稳定版能力。
 - 总体方案（`docs/overall-roadmap.md`）已制定，分三个阶段推进。
-- 当前阶段：v1.0 阶段一 1A（前端架构升级：Zustand 状态管理）已完成。
+- 当前阶段：v1.0 阶段一 1A（前端架构升级：Zustand 状态管理）✅ 已完成，1B（后端架构升级）✅ 已完成。
 
 当前后端结构：
 
 ```text
 backend/
   requirements.txt
+  .env.example
   app/
     __init__.py
     main.py
     database.py
+    logging_config.py
+    errors.py
+    error_handler.py
+    config/
+      __init__.py
+      settings.py
     api/
       __init__.py
       health.py

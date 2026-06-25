@@ -1,10 +1,14 @@
 import json
+import logging
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.database import get_current_user_id, get_connection
+from app.errors import ErrorCode, api_error
+
+logger = logging.getLogger(__name__)
 from app.services.market_data import MarketDataError, get_stock_quote, get_stock_history
 from app.services.technical_indicators import build_technical_indicators
 from app.services.report_builder import build_analysis_report
@@ -53,6 +57,7 @@ def create_analysis_task(analysis: AnalysisCreate, user_id: str = Depends(get_cu
     progress = 100
     message = "analysis completed with real-time quote and technical indicators"
 
+    logger.info("创建分析任务: stock=%s, task=%s", analysis.stock_code, task_id)
     try:
         quote = get_stock_quote(analysis.stock_code)
     except MarketDataError as error:
@@ -68,16 +73,7 @@ def create_analysis_task(analysis: AnalysisCreate, user_id: str = Depends(get_cu
                 (task_id, analysis.stock_code, "failed", 0, failed_message, None, user_id),
             )
 
-        return {
-            "message": "analysis task failed",
-            "task_id": task_id,
-            "stock_code": analysis.stock_code,
-            "status": "failed",
-            "progress": 0,
-            "report_id": None,
-            "error_code": "MARKET_DATA_ERROR",
-            "message": failed_message,
-        }
+        raise api_error(400, ErrorCode.MARKET_DATA_ERROR, failed_message)
 
     try:
         history = get_stock_history(analysis.stock_code)
@@ -94,16 +90,7 @@ def create_analysis_task(analysis: AnalysisCreate, user_id: str = Depends(get_cu
                 (task_id, analysis.stock_code, "failed", 0, failed_message, None, user_id),
             )
 
-        return {
-            "message": "analysis task failed",
-            "task_id": task_id,
-            "stock_code": analysis.stock_code,
-            "status": "failed",
-            "progress": 0,
-            "report_id": None,
-            "error_code": "MARKET_DATA_ERROR",
-            "message": failed_message,
-        }
+        raise api_error(400, ErrorCode.MARKET_DATA_ERROR, failed_message)
 
     technicals = build_technical_indicators(quote.price, history)
     report = build_analysis_report(quote, technicals)
@@ -144,6 +131,8 @@ def create_analysis_task(analysis: AnalysisCreate, user_id: str = Depends(get_cu
     report["report_id"] = report_id
     _write_analysis_record(report, task_id, user_id)
 
+    logger.info("分析任务完成: task=%s, stock=%s, report_id=%s",
+                 task_id, analysis.stock_code, report_id)
     return {
         "message": "analysis task created",
         "task_id": task_id,
@@ -168,10 +157,7 @@ def get_analysis_task(task_id: str, user_id: str = Depends(get_current_user_id))
         ).fetchone()
 
     if row is None:
-        raise HTTPException(
-            status_code=404,
-            detail={"error_code": "TASK_NOT_FOUND", "message": "任务不存在"},
-        )
+        raise api_error(404, ErrorCode.TASK_NOT_FOUND, "任务不存在")
 
     return {
         "task_id": row["task_id"],
