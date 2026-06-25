@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useDataRefresh } from '../contexts/DataRefreshContext';
+import { resetAllStores } from '../stores';
 
 export interface ApiErrorResult {
   message: string;
@@ -31,7 +31,6 @@ function extractErrorInfo(err: unknown): { message: string; status?: number; err
 
 export function useApiErrorHandler() {
   const { clearSession } = useAuth();
-  const { notifyAllDataChanged } = useDataRefresh();
 
   const handleError = useCallback(
     (err: unknown, fallbackMessage?: string): ApiErrorResult => {
@@ -43,7 +42,7 @@ export function useApiErrorHandler() {
 
       if (isAuthExpired) {
         clearSession();
-        notifyAllDataChanged();
+        resetAllStores();
         return {
           message: '登录状态已失效，请重新登录',
           isAuthExpired: true,
@@ -55,7 +54,7 @@ export function useApiErrorHandler() {
         isAuthExpired: false,
       };
     },
-    [clearSession, notifyAllDataChanged],
+    [clearSession],
   );
 
   return { handleError };

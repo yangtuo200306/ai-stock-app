@@ -3,11 +3,9 @@ import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-nati
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { apiPost } from '../api/client';
-import type { AskMessage, AskResponse, RootTabParamList } from '../types';
+import type { RootTabParamList } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { useDataRefresh } from '../contexts/DataRefreshContext';
-import { useApiErrorHandler } from '../hooks/useApiErrorHandler';
+import { useAskStore } from '../stores/askStore';
 import { AppButton } from '../components/AppButton';
 import { AppCard } from '../components/AppCard';
 import { LoginRequiredView } from '../components/LoginRequiredView';
@@ -26,14 +24,10 @@ export default function AskScreen() {
   const route = useRoute<AskRouteProp>();
   const navigation = useNavigation<AskTabNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
-  const { notifyRecordsChanged, notifyWatchlistChanged } = useDataRefresh();
-  const { handleError } = useApiErrorHandler();
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<AskMessage[]>([]);
-  const [question, setQuestion] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [latestResult, setLatestResult] = useState<AskResponse | null>(null);
+  const {
+    sessionId, messages, question, isLoading, error, latestResult,
+    setQuestion, handleAsk, handleNewSession, handleAddToWatchlist, restoreSession,
+  } = useAskStore();
   const [addToWatchlistLoading, setAddToWatchlistLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const initialParamsHandled = useRef(false);
@@ -46,98 +40,27 @@ export default function AskScreen() {
     if (params.initialQuestion) {
       setQuestion(params.initialQuestion);
     }
-    if (params.sessionId) {
-      setSessionId(params.sessionId);
-    }
-    if (params.initialMessages && params.initialMessages.length > 0) {
-      setMessages(params.initialMessages);
+    if (params.sessionId && params.initialMessages && params.initialMessages.length > 0) {
+      restoreSession(params.sessionId, params.initialMessages);
     }
     initialParamsHandled.current = true;
-  }, [route.params]);
+  }, [route.params, setQuestion, restoreSession]);
 
-  const handleNewSession = useCallback(() => {
-    setSessionId(null);
-    setMessages([]);
-    setLatestResult(null);
-    setQuestion('');
-    setError('');
+  const onNewSession = useCallback(() => {
+    handleNewSession();
     initialParamsHandled.current = false;
-  }, []);
+  }, [handleNewSession]);
 
-  const handleAsk = async () => {
-    if (!question.trim()) {
-      setError('请先输入股票问题');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const body: Record<string, unknown> = { question: question.trim() };
-      if (sessionId) {
-        body.session_id = sessionId;
-      }
-
-      const data = await apiPost('/api/ask', body);
-
-      if (data.stock_code) {
-        const result = data as AskResponse;
-
-        const newMessages: AskMessage[] = [
-          ...messages,
-          { id: Date.now(), role: 'user', content: question.trim(), created_at: new Date().toISOString() },
-          {
-            id: result.message_id ?? Date.now() + 1,
-            role: 'assistant',
-            content: result.answer,
-            answer_type: result.answer_type,
-            ai_status: result.ai_status,
-            model: result.model,
-            created_at: new Date().toISOString(),
-          },
-        ];
-
-        setMessages(newMessages);
-        setLatestResult(result);
-        setSessionId(result.session_id ?? null);
-        setQuestion('');
-
-        notifyRecordsChanged();
-        notifyWatchlistChanged();
-      } else {
-        setError(data.message || data.detail || '问股失败，请稍后重试');
-      }
-    } catch (err: unknown) {
-      const { message } = handleError(err, '问股失败，请检查后端地址或服务是否启动');
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddToWatchlist = async () => {
-    if (!latestResult) return;
-
+  const onAddToWatchlist = useCallback(async () => {
     setAddToWatchlistLoading(true);
-    try {
-      const data = await apiPost('/api/stocks', {
-        code: latestResult.stock_code,
-        name: latestResult.stock_name,
-      });
-
-      if (data.message === 'stock added' || data.message === 'stock already exists') {
-        Alert.alert('提示', '已加入自选');
-        notifyWatchlistChanged();
-      } else {
-        Alert.alert('提示', '加入自选失败，请稍后重试');
-      }
-    } catch {
+    const result = await handleAddToWatchlist();
+    if (result) {
+      Alert.alert('提示', '已加入自选');
+    } else {
       Alert.alert('提示', '加入自选失败，请检查后端服务');
-    } finally {
-      setAddToWatchlistLoading(false);
     }
-  };
+    setAddToWatchlistLoading(false);
+  }, [handleAddToWatchlist]);
 
   if (authLoading) {
     return <StateView type="loading" />;
@@ -166,7 +89,7 @@ export default function AskScreen() {
             <AppButton
               title="新建会话"
               variant="ghost"
-              onPress={handleNewSession}
+              onPress={onNewSession}
               style={styles.newSessionButton}
             />
           )}
@@ -181,10 +104,10 @@ export default function AskScreen() {
         />
 
         <AppButton
-          title={loading ? '分析中...' : '发送'}
+          title={isLoading ? '分析中...' : '发送'}
           onPress={handleAsk}
-          loading={loading}
-          disabled={loading}
+          loading={isLoading}
+          disabled={isLoading}
           style={styles.submitButton}
         />
 
@@ -250,7 +173,7 @@ export default function AskScreen() {
             <AppButton
               title={addToWatchlistLoading ? '添加中...' : '加入自选'}
               variant="secondary"
-              onPress={handleAddToWatchlist}
+              onPress={onAddToWatchlist}
               loading={addToWatchlistLoading}
               disabled={addToWatchlistLoading}
               style={styles.watchlistButton}

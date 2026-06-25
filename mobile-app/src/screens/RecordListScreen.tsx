@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { apiGet } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import { useDataRefresh } from '../contexts/DataRefreshContext';
-import { useApiErrorHandler } from '../hooks/useApiErrorHandler';
+import { useRecordsStore } from '../stores/recordsStore';
 import type { RecordItem, RecordStackParamList, RootTabParamList } from '../types';
 import { AppCard } from '../components/AppCard';
 import { LoginRequiredView } from '../components/LoginRequiredView';
@@ -24,32 +22,12 @@ export default function RecordListScreen() {
   const navigation = useNavigation<NavigationType>();
   const tabNavigation = useNavigation<TabNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
-  const { recordsVersion } = useDataRefresh();
-  const { handleError } = useApiErrorHandler();
-  const [items, setItems] = useState<RecordItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const fetchRecords = useCallback(async () => {
-    if (authLoading || !isLoggedIn) return;
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const data = await apiGet('/api/records');
-      setItems(data.items ?? []);
-    } catch (err: unknown) {
-      const { message } = handleError(err, '加载记录失败，请检查后端服务是否启动');
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [authLoading, isLoggedIn, handleError]);
+  const { items, isLoading, loadError, fetchRecords } = useRecordsStore();
 
   useEffect(() => {
+    if (authLoading || !isLoggedIn) return;
     fetchRecords();
-  }, [fetchRecords, recordsVersion]);
+  }, [authLoading, isLoggedIn, fetchRecords]);
 
   if (authLoading) {
     return <StateView type="loading" />;
@@ -66,16 +44,16 @@ export default function RecordListScreen() {
     );
   }
 
-  if (loading) {
+  if (isLoading) {
     return <StateView type="loading" title="正在加载记录..." />;
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <StateView
         type="error"
         title="记录加载失败"
-        description={error}
+        description={loadError}
         actionLabel="重新加载"
         onActionPress={fetchRecords}
       />

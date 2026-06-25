@@ -68,6 +68,10 @@ async function handleResponse(res: Response): Promise<any> {
   }
 
   if (!res.ok) {
+    // 401 时自动清除 token
+    if (res.status === 401) {
+      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    }
     const { message, errorCode } = extractErrorMessage(data);
     throw new ApiError(message, res.status, errorCode, data);
   }

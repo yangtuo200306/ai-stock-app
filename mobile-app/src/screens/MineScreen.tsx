@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
-import { useDataRefresh } from '../contexts/DataRefreshContext';
+import { resetAllStores } from '../stores';
 import type { MineStackParamList } from '../types';
 import { STORAGE_KEYS } from '../api/client';
 import { AppButton } from '../components/AppButton';
@@ -18,7 +18,6 @@ type NavProp = NativeStackNavigationProp<MineStackParamList, 'Mine'>;
 export default function MineScreen() {
   const navigation = useNavigation<NavProp>();
   const { isLoggedIn, username, logout } = useAuth();
-  const { notifyAllDataChanged } = useDataRefresh();
   const [backendUrl, setBackendUrl] = useState('');
   const [savedBackendUrl, setSavedBackendUrl] = useState('');
   const [message, setMessage] = useState('暂未操作');
@@ -50,8 +49,8 @@ export default function MineScreen() {
 
   const handleLogout = useCallback(async () => {
     await logout();
-    notifyAllDataChanged();
-  }, [logout, notifyAllDataChanged]);
+    resetAllStores();
+  }, [logout]);
 
   const handleTestConnection = async () => {
     if (!backendUrl) {
@@ -96,8 +95,8 @@ export default function MineScreen() {
 
       <AppCard style={styles.card}>
         <Text style={styles.sectionTitle}>应用信息</Text>
-        <Text style={styles.infoText}>当前版本：v0.8</Text>
-        <Text style={styles.infoText}>当前能力：页面体验与公共 UI 基础</Text>
+        <Text style={styles.infoText}>当前版本：v1.0</Text>
+        <Text style={styles.infoText}>当前能力：前端架构升级（Zustand 状态管理）</Text>
       </AppCard>
 
       <AppCard style={styles.card}>

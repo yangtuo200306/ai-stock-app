@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
-import { useDataRefresh } from '../contexts/DataRefreshContext';
 import { AppButton } from '../components/AppButton';
 import { AppCard } from '../components/AppCard';
 import { colors } from '../theme/colors';
@@ -12,7 +11,6 @@ import { typography } from '../theme/typography';
 export default function LoginScreen() {
   const navigation = useNavigation();
   const { login, register } = useAuth();
-  const { notifyAllDataChanged } = useDataRefresh();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -46,7 +44,6 @@ export default function LoginScreen() {
         : await register(username.trim(), password);
 
     if (result.success) {
-      notifyAllDataChanged();
       navigation.goBack();
     } else {
       setError(result.error || '操作失败');

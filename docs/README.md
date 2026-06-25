@@ -37,7 +37,7 @@ npm run web -- --clear
 | 行情源 | efinance（主源）+ 新浪（fallback） |
 | AI | 火山方舟 DeepSeek |
 | 导航 | React Navigation 6（Tab + Stack） |
-| 状态 | Context + 刷新信号模式 |
+| 状态 | Zustand（store）+ AuthContext |
 
 ## 项目结构
 
@@ -51,7 +51,8 @@ ai-stock-app/
 ├── mobile-app/        # React Native 移动端
 │   └── src/
 │       ├── api/       # 统一 API 调用
-│       ├── contexts/  # 全局状态
+│       ├── contexts/  # 全局状态（AuthContext）
+│       ├── stores/    # Zustand 状态管理
 │       ├── hooks/     # 自定义 Hook
 │       ├── navigation/# 导航
 │       ├── screens/   # 页面
@@ -79,6 +80,7 @@ ai-stock-app/
 | v0.7 | 新建会话、继续追问、自选摘要、报告类型 |
 | v0.8 | 公共 UI 组件、主题系统、统一状态展示 |
 | v0.9 | 刷新信号层、结构化 ApiError、统一 401 处理、任务轮询 |
+| v1.0 | Zustand 状态管理、类型拆分、DataRefreshContext 移除 |
 
 ## 文档索引
 

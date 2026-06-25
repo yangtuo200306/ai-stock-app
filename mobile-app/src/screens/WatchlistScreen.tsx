@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from '../contexts/AuthContext';
-import { useDataRefresh } from '../contexts/DataRefreshContext';
-import { useApiErrorHandler } from '../hooks/useApiErrorHandler';
 import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { apiGet, apiPost, apiDelete } from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
+import { useWatchlistStore } from '../stores/watchlistStore';
 import type { Stock, WatchlistStackParamList, RootTabParamList } from '../types';
 import { AppButton } from '../components/AppButton';
 import { AppCard } from '../components/AppCard';
@@ -20,20 +17,6 @@ import { getRecordTypeColor, getRecordTypeLabel } from '../utils/recordDisplay';
 import { getTaskStatusColor, getTaskStatusLabel } from '../utils/taskStatusDisplay';
 import { normalizeAShareCode } from '../utils/stockDisplay';
 
-const TASK_IDS_KEY = 'stockTaskIds';
-
-async function readTaskIds() {
-  const saved = await AsyncStorage.getItem(TASK_IDS_KEY);
-  if (!saved) return {};
-
-  try {
-    return JSON.parse(saved) as Record<string, string>;
-  } catch {
-    await AsyncStorage.removeItem(TASK_IDS_KEY);
-    return {};
-  }
-}
-
 type NavProp = NativeStackNavigationProp<WatchlistStackParamList, 'Watchlist'>;
 type TabNavProp = BottomTabNavigationProp<RootTabParamList>;
 
@@ -41,58 +24,15 @@ export default function WatchlistScreen() {
   const navigation = useNavigation<NavProp>();
   const tabNavigation = useNavigation<TabNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
-  const { watchlistVersion, tasksVersion, notifyWatchlistChanged, notifyTasksChanged } = useDataRefresh();
-  const { handleError } = useApiErrorHandler();
-  const [stocks, setStocks] = useState<Stock[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadError, setLoadError] = useState('');
+  const { stocks, taskStatuses, isLoading, loadError, loadStocks, loadTaskStatuses, addStock, deleteStock, createAnalysis } = useWatchlistStore();
   const [newCode, setNewCode] = useState('');
   const [newName, setNewName] = useState('');
-  const [taskStatuses, setTaskStatuses] = useState<Record<string, string>>({});
-
-  const loadStocks = useCallback(async () => {
-    if (authLoading || !isLoggedIn) return;
-
-    setIsLoading(true);
-    setLoadError('');
-
-    try {
-      const data = await apiGet('/api/stocks');
-      setStocks(data.items ?? []);
-    } catch {
-      setLoadError('加载自选股失败，请检查后端服务');
-      setStocks([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [authLoading, isLoggedIn]);
-
-  const loadTaskStatuses = useCallback(async () => {
-    if (authLoading || !isLoggedIn) return;
-
-    const taskIds = await readTaskIds();
-
-    const newStatuses: Record<string, string> = {};
-    for (const [stockCode, taskId] of Object.entries(taskIds)) {
-      try {
-        const data = await apiGet(`/api/analysis/${taskId}`);
-        if (data.status) {
-          newStatuses[stockCode] = data.status;
-        }
-      } catch {
-        // ignore
-      }
-    }
-    setTaskStatuses(newStatuses);
-  }, [authLoading, isLoggedIn]);
 
   useEffect(() => {
+    if (authLoading || !isLoggedIn) return;
     loadStocks();
-  }, [loadStocks, watchlistVersion]);
-
-  useEffect(() => {
     loadTaskStatuses();
-  }, [loadTaskStatuses, tasksVersion]);
+  }, [authLoading, isLoggedIn, loadStocks, loadTaskStatuses]);
 
   const handleAddStock = useCallback(async () => {
     const normalizedCode = normalizeAShareCode(newCode);
@@ -108,71 +48,38 @@ export default function WatchlistScreen() {
       return;
     }
 
-    try {
-      const data = await apiPost('/api/stocks', { code: normalizedCode, name: stockName });
-      if (data.message === 'stock added') {
-        setNewCode('');
-        setNewName('');
-        notifyWatchlistChanged();
-      } else {
-        Alert.alert('错误', '添加自选股失败');
-      }
-    } catch {
+    const success = await addStock(normalizedCode, stockName);
+    if (success) {
+      setNewCode('');
+      setNewName('');
+    } else {
       Alert.alert('错误', '添加自选股失败，请检查后端服务');
     }
-  }, [newCode, newName, notifyWatchlistChanged]);
+  }, [newCode, newName, addStock]);
 
   const handleDeleteStock = useCallback(
     async (code: string) => {
-      try {
-        const { ok } = await apiDelete(`/api/stocks/${code}`);
-        if (ok) {
-          const taskIds = await readTaskIds();
-          delete taskIds[code];
-          await AsyncStorage.setItem(TASK_IDS_KEY, JSON.stringify(taskIds));
-          setTaskStatuses((prev) => {
-            const next = { ...prev };
-            delete next[code];
-            return next;
-          });
-          notifyWatchlistChanged();
-          notifyTasksChanged();
-          
-          // 直接触发当前页重新加载，确保列表刷新
-          await loadStocks();
-          await loadTaskStatuses();
-        }
-      } catch (err: unknown) {
-        Alert.alert('错误', err instanceof Error ? err.message : '删除自选股失败');
+      const success = await deleteStock(code);
+      if (!success) {
+        Alert.alert('错误', '删除自选股失败');
       }
     },
-    [notifyWatchlistChanged, notifyTasksChanged, loadStocks, loadTaskStatuses],
+    [deleteStock],
   );
 
   const handleCreateAnalysis = useCallback(
     async (stock: Stock) => {
-      try {
-        const data = await apiPost('/api/analysis', { stock_code: stock.code });
-        if (data.task_id) {
-          const taskIds = await readTaskIds();
-          taskIds[stock.code] = data.task_id;
-          await AsyncStorage.setItem(TASK_IDS_KEY, JSON.stringify(taskIds));
-
-          setTaskStatuses((prev) => ({ ...prev, [stock.code]: data.status }));
-          notifyTasksChanged();
-
-          navigation.navigate('TaskStatus', {
-            taskId: data.task_id,
-            stockCode: stock.code,
-          });
-        } else {
-          Alert.alert('错误', '创建分析任务失败');
-        }
-      } catch (err: unknown) {
-        Alert.alert('错误', err instanceof Error ? err.message : '创建分析任务失败，请检查后端服务');
+      const taskId = await createAnalysis(stock.code);
+      if (taskId) {
+        navigation.navigate('TaskStatus', {
+          taskId,
+          stockCode: stock.code,
+        });
+      } else {
+        Alert.alert('错误', '创建分析任务失败，请检查后端服务');
       }
     },
-    [navigation, notifyTasksChanged],
+    [navigation, createAnalysis],
   );
 
   const handleAskAI = useCallback(

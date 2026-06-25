@@ -6,8 +6,9 @@ import type { RouteProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { apiGet } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import { useDataRefresh } from '../contexts/DataRefreshContext';
 import { useApiErrorHandler } from '../hooks/useApiErrorHandler';
+import { useWatchlistStore } from '../stores/watchlistStore';
+import { useRecordsStore } from '../stores/recordsStore';
 import type { AnalysisTask, WatchlistStackParamList, RootTabParamList } from '../types';
 import { AppButton } from '../components/AppButton';
 import { AppCard } from '../components/AppCard';
@@ -29,7 +30,6 @@ export default function TaskStatusScreen() {
   const navigation = useNavigation<NavProp>();
   const tabNavigation = useNavigation<TabNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
-  const { notifyTasksChanged, notifyRecordsChanged, notifyWatchlistChanged } = useDataRefresh();
   const { handleError } = useApiErrorHandler();
   const { taskId, stockCode } = route.params;
   const [task, setTask] = useState<AnalysisTask | null>(null);
@@ -55,15 +55,16 @@ export default function TaskStatusScreen() {
         setTask(currentTask);
         setError('');
 
-        notifyTasksChanged();
+        // 通知 store 刷新
+        useWatchlistStore.getState().loadStocks();
+        useWatchlistStore.getState().loadTaskStatuses();
 
         if (currentTask.status === 'completed' || currentTask.status === 'failed') {
           stopPolling();
         }
 
         if (currentTask.status === 'completed' && currentTask.report_id) {
-          notifyRecordsChanged();
-          notifyWatchlistChanged();
+          useRecordsStore.getState().fetchRecords();
         }
       } else {
         setError('任务不存在');
@@ -74,7 +75,7 @@ export default function TaskStatusScreen() {
       setError(message);
       stopPolling();
     }
-  }, [authLoading, isLoggedIn, taskId, notifyTasksChanged, notifyRecordsChanged, notifyWatchlistChanged, handleError, stopPolling]);
+  }, [authLoading, isLoggedIn, taskId, handleError, stopPolling]);
 
   useEffect(() => {
     fetchTask();
