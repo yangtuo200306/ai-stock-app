@@ -5,9 +5,23 @@ const STORAGE_KEYS = {
   AUTH_TOKEN: 'authToken',
 };
 
+export class ApiError extends Error {
+  status?: number;
+  errorCode?: string;
+  raw?: unknown;
+
+  constructor(message: string, status?: number, errorCode?: string, raw?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.errorCode = errorCode;
+    this.raw = raw;
+  }
+}
+
 async function getBaseUrl(): Promise<string> {
   const url = await AsyncStorage.getItem(STORAGE_KEYS.BACKEND_URL);
-  if (!url) throw new Error('请先配置后端地址');
+  if (!url) throw new ApiError('请先配置后端地址');
   return url;
 }
 
@@ -15,27 +29,49 @@ async function getToken(): Promise<string | null> {
   return AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
 }
 
-function extractErrorMessage(data: unknown): string {
+function extractErrorMessage(data: unknown): { message: string; errorCode?: string } {
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
-    if (obj.detail && typeof obj.detail === 'object' && 'message' in (obj.detail as Record<string, unknown>)) {
-      return (obj.detail as Record<string, unknown>).message as string;
+    // FastAPI structured error: { detail: { message, error_code } }
+    if (obj.detail && typeof obj.detail === 'object') {
+      const detail = obj.detail as Record<string, unknown>;
+      const message =
+        typeof detail.message === 'string'
+          ? detail.message
+          : typeof detail.detail === 'string'
+            ? detail.detail
+            : undefined;
+      const errorCode = typeof detail.error_code === 'string' ? detail.error_code : undefined;
+      if (message) return { message, errorCode };
     }
-    if (typeof obj.message === 'string') {
-      return obj.message;
-    }
+    // FastAPI plain detail string
     if (typeof obj.detail === 'string') {
-      return obj.detail;
+      return { message: obj.detail };
+    }
+    // Generic message field
+    if (typeof obj.message === 'string') {
+      return { message: obj.message };
     }
   }
-  return '请求失败';
+  return { message: '请求失败' };
 }
 
 async function handleResponse(res: Response): Promise<any> {
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(extractErrorMessage(data));
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    throw new ApiError(
+      res.status === 401 ? '登录状态已失效，请重新登录' : `请求失败 (HTTP ${res.status})`,
+      res.status,
+    );
   }
+
+  if (!res.ok) {
+    const { message, errorCode } = extractErrorMessage(data);
+    throw new ApiError(message, res.status, errorCode, data);
+  }
+
   return data;
 }
 
@@ -70,11 +106,7 @@ export async function apiDelete(path: string) {
     method: 'DELETE',
     headers,
   });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(extractErrorMessage(data));
-  }
-  return { ok: res.ok, data };
+  return handleResponse(res);
 }
 
 export { STORAGE_KEYS };

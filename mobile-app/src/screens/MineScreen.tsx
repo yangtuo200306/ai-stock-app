@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
+import { useDataRefresh } from '../contexts/DataRefreshContext';
 import type { MineStackParamList } from '../types';
 import { STORAGE_KEYS } from '../api/client';
 import { AppButton } from '../components/AppButton';
@@ -17,6 +18,7 @@ type NavProp = NativeStackNavigationProp<MineStackParamList, 'Mine'>;
 export default function MineScreen() {
   const navigation = useNavigation<NavProp>();
   const { isLoggedIn, username, logout } = useAuth();
+  const { notifyAllDataChanged } = useDataRefresh();
   const [backendUrl, setBackendUrl] = useState('');
   const [savedBackendUrl, setSavedBackendUrl] = useState('');
   const [message, setMessage] = useState('暂未操作');
@@ -45,6 +47,11 @@ export default function MineScreen() {
     setSavedBackendUrl(backendUrl);
     setMessage('地址已保存');
   };
+
+  const handleLogout = useCallback(async () => {
+    await logout();
+    notifyAllDataChanged();
+  }, [logout, notifyAllDataChanged]);
 
   const handleTestConnection = async () => {
     if (!backendUrl) {
@@ -77,7 +84,7 @@ export default function MineScreen() {
         {isLoggedIn ? (
           <View style={styles.sectionBody}>
             <Text style={styles.usernameText}>当前用户：{username}</Text>
-            <AppButton title="退出登录" variant="danger" onPress={logout} />
+            <AppButton title="退出登录" variant="danger" onPress={handleLogout} />
           </View>
         ) : (
           <View style={styles.sectionBody}>

@@ -11,6 +11,7 @@ type AuthContextValue = {
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
+  clearSession: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue>({
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextValue>({
   login: async () => ({ success: false }),
   register: async () => ({ success: false }),
   logout: async () => {},
+  clearSession: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -29,6 +31,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const clearAuthState = useCallback(() => {
+    setToken(null);
+    setUserId(null);
+    setUsername(null);
+  }, []);
 
   useEffect(() => {
     const restoreToken = async () => {
@@ -55,16 +63,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUsername(data.username);
         } else {
           await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+          clearAuthState();
         }
       } catch {
         await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+        clearAuthState();
       } finally {
         setIsLoading(false);
       }
     };
 
     restoreToken();
-  }, []);
+  }, [clearAuthState]);
 
   const login = useCallback(async (usernameInput: string, password: string) => {
     const backendUrl = await AsyncStorage.getItem(STORAGE_KEYS.BACKEND_URL);
@@ -127,15 +137,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           headers: { Authorization: `Bearer ${token}` },
         });
       } catch {
-        // ignore
+        // ignore network errors during logout
       }
     }
 
     await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    setToken(null);
-    setUserId(null);
-    setUsername(null);
-  }, [token]);
+    clearAuthState();
+  }, [token, clearAuthState]);
+
+  const clearSession = useCallback(() => {
+    clearAuthState();
+  }, [clearAuthState]);
 
   return (
     <AuthContext.Provider
@@ -148,6 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         logout,
+        clearSession,
       }}
     >
       {children}

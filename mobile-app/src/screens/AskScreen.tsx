@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { apiPost } from '../api/client';
 import type { AskMessage, AskResponse, RootTabParamList } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useDataRefresh } from '../contexts/DataRefreshContext';
+import { useApiErrorHandler } from '../hooks/useApiErrorHandler';
 import { AppButton } from '../components/AppButton';
 import { AppCard } from '../components/AppCard';
 import { LoginRequiredView } from '../components/LoginRequiredView';
@@ -17,11 +20,14 @@ import { typography } from '../theme/typography';
 import { formatChangePct, getChangeColor } from '../utils/stockDisplay';
 
 type AskRouteProp = RouteProp<RootTabParamList, '问股'>;
+type AskTabNavProp = BottomTabNavigationProp<RootTabParamList>;
 
 export default function AskScreen() {
   const route = useRoute<AskRouteProp>();
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<AskTabNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
+  const { notifyRecordsChanged, notifyWatchlistChanged } = useDataRefresh();
+  const { handleError } = useApiErrorHandler();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AskMessage[]>([]);
   const [question, setQuestion] = useState('');
@@ -96,11 +102,15 @@ export default function AskScreen() {
         setLatestResult(result);
         setSessionId(result.session_id ?? null);
         setQuestion('');
+
+        notifyRecordsChanged();
+        notifyWatchlistChanged();
       } else {
         setError(data.message || data.detail || '问股失败，请稍后重试');
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : '问股失败，请检查后端地址或服务是否启动');
+      const { message } = handleError(err, '问股失败，请检查后端地址或服务是否启动');
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -118,6 +128,7 @@ export default function AskScreen() {
 
       if (data.message === 'stock added' || data.message === 'stock already exists') {
         Alert.alert('提示', '已加入自选');
+        notifyWatchlistChanged();
       } else {
         Alert.alert('提示', '加入自选失败，请稍后重试');
       }

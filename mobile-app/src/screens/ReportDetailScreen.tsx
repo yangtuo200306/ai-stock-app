@@ -5,6 +5,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { apiGet } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useApiErrorHandler } from '../hooks/useApiErrorHandler';
 import type { Report, RootTabParamList } from '../types';
 import { AppCard } from '../components/AppCard';
 import { LoginRequiredView } from '../components/LoginRequiredView';
@@ -22,6 +23,7 @@ export default function ReportDetailScreen() {
   const route = useRoute<RouteType>();
   const tabNavigation = useNavigation<TabNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
+  const { handleError } = useApiErrorHandler();
   const { reportId } = route.params;
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState('');
@@ -38,12 +40,13 @@ export default function ReportDetailScreen() {
           setError('报告不存在');
         }
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : '获取报告失败');
+        const { message } = handleError(err, '获取报告失败');
+        setError(message);
       }
     };
 
     fetchReport();
-  }, [authLoading, isLoggedIn, reportId]);
+  }, [authLoading, isLoggedIn, reportId, handleError]);
 
   if (authLoading) {
     return <StateView type="loading" />;

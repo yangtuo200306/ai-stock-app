@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
+import { useDataRefresh } from '../contexts/DataRefreshContext';
+import { useApiErrorHandler } from '../hooks/useApiErrorHandler';
 import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -39,6 +41,8 @@ export default function WatchlistScreen() {
   const navigation = useNavigation<NavProp>();
   const tabNavigation = useNavigation<TabNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
+  const { watchlistVersion, tasksVersion, notifyWatchlistChanged, notifyTasksChanged } = useDataRefresh();
+  const { handleError } = useApiErrorHandler();
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -84,11 +88,11 @@ export default function WatchlistScreen() {
 
   useEffect(() => {
     loadStocks();
-  }, [loadStocks]);
+  }, [loadStocks, watchlistVersion]);
 
   useEffect(() => {
     loadTaskStatuses();
-  }, [loadTaskStatuses]);
+  }, [loadTaskStatuses, tasksVersion]);
 
   const handleAddStock = useCallback(async () => {
     const normalizedCode = normalizeAShareCode(newCode);
@@ -109,14 +113,14 @@ export default function WatchlistScreen() {
       if (data.message === 'stock added') {
         setNewCode('');
         setNewName('');
-        await loadStocks();
+        notifyWatchlistChanged();
       } else {
         Alert.alert('错误', '添加自选股失败');
       }
     } catch {
       Alert.alert('错误', '添加自选股失败，请检查后端服务');
     }
-  }, [newCode, newName, loadStocks]);
+  }, [newCode, newName, notifyWatchlistChanged]);
 
   const handleDeleteStock = useCallback(
     async (code: string) => {
@@ -131,13 +135,14 @@ export default function WatchlistScreen() {
             delete next[code];
             return next;
           });
-          await loadStocks();
+          notifyWatchlistChanged();
+          notifyTasksChanged();
         }
       } catch (err: unknown) {
         Alert.alert('错误', err instanceof Error ? err.message : '删除自选股失败');
       }
     },
-    [loadStocks],
+    [notifyWatchlistChanged, notifyTasksChanged],
   );
 
   const handleCreateAnalysis = useCallback(
@@ -150,6 +155,7 @@ export default function WatchlistScreen() {
           await AsyncStorage.setItem(TASK_IDS_KEY, JSON.stringify(taskIds));
 
           setTaskStatuses((prev) => ({ ...prev, [stock.code]: data.status }));
+          notifyTasksChanged();
 
           navigation.navigate('TaskStatus', {
             taskId: data.task_id,
@@ -162,7 +168,7 @@ export default function WatchlistScreen() {
         Alert.alert('错误', err instanceof Error ? err.message : '创建分析任务失败，请检查后端服务');
       }
     },
-    [navigation],
+    [navigation, notifyTasksChanged],
   );
 
   const handleAskAI = useCallback(

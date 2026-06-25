@@ -1187,14 +1187,78 @@
 - 当前是否需要立即修：否，当前项目尚未建立前端测试体系。
 - 后续建议：后续可为展示工具函数先补轻量单元测试，再考虑组件测试。
 
-## 问题 132：v0.8 目前只做 diagnostics，未跑完整构建命令
+## 问题 135：v0.8 目前只做了 diagnostics，未跑完整构建命令
 
 - 位置：`mobile-app`
 - 类型：验证覆盖隐患
 - 现象：本次执行阶段对修改文件执行了 VS Code diagnostics，但没有运行完整 TypeScript 或应用构建命令。
 - 影响：diagnostics 无报错不等于完整构建和运行一定无问题。
 - 当前是否需要立即修：审查或验收阶段确认是否需要运行。
-- 后续建议：审查阶段补充 `npm`/TypeScript 构建检查和手动 App 链路验证。
+- 后续建议：审查阶段补充 npm/TypeScript 构建检查和手动 App 链路验证。
+
+## 问题 136：401 token 失效后没有自动跳登录页
+
+- 位置：`mobile-app/src/hooks/useApiErrorHandler.ts`
+- 类型：鉴权体验隐患
+- 现象：`useApiErrorHandler` 检测到 401 或 token 失效后，目前只做了 `clearSession()` 清 token 和 `notifyAllDataChanged()` 触发页面刷新，没有自动导航到登录页。
+- 影响：用户能看到"登录状态已失效，请重新登录"提示，但需要手动切换 Tab 或重新进入受保护页面，体验不够直接。
+- 当前是否需要立即修：否，v0.9 最小稳定版可接受。
+- 后续建议：后续统一接入全局导航处理，或让每个页面 catch 后根据 `isAuthExpired` 结果决定是否跳转。
+
+## 问题 137：不是所有受保护页面都接入了 useApiErrorHandler
+
+- 位置：`mobile-app/src/screens/RecordDetailScreen.tsx`、`ReportDetailScreen.tsx` 等
+- 类型：状态管理覆盖隐患
+- 现象：`WatchlistScreen`、`AskScreen`、`RecordListScreen`、`TaskStatusScreen` 已接入统一错误处理，但 `RecordDetailScreen`、`ReportDetailScreen`、`LoginScreen`、`MineScreen` 等页面 catch 时仍直接显示原始错误信息。
+- 影响：token 失效时，进入记录详情或报告详情页的体验可能与其他页面不一致。
+- 当前是否需要立即修：否，v0.9 已覆盖主要高频页面。
+- 后续建议：后续统一页面错误处理模式时，补充剩余受保护页面的接入。
+
+## 问题 138：MineScreen 仍显示版本 v0.8 硬编码
+
+- 位置：`mobile-app/src/screens/MineScreen.tsx`
+- 类型：信息展示一致性问题
+- 现象：v0.9 已完成但我的页面仍显示"当前版本：v0.8"。
+- 影响：当前展示信息不代表真实版本。
+- 当前是否需要立即修：否，极低影响，提交时可以同步更新或单独改。
+- 后续建议：后续抽出版本常量，统一来源。
+
+## 问题 139：Navigation 类型仍有少量 any 未完全收口
+
+- 位置：`mobile-app/src/screens/` 下部分页面
+- 类型：类型质量隐患
+- 现象：v0.9 收口了 AskScreen 的 `useNavigation<any>`，但仍有少量跨 Stack 跳转或 `navigation.goBack()` 场景没有显式约束完整类型。
+- 影响：功能不受影响；如果后续类型定义有变化，编译期保护不够完整。
+- 当前是否需要立即修：否，极小概率问题。
+- 后续建议：后续重构导航结构时补充完整类型定义。
+
+## 问题 140：DataRefreshContext 只做刷新信号，未做状态缓存的边界问题
+
+- 位置：`mobile-app/src/contexts/DataRefreshContext.tsx`、所有接入页面
+- 类型：架构设计隐患
+- 现象：v0.9 采用"版本号 + 页面各自重新请求"的轻量同步模式，没有引入 Zustand 或全局缓存。
+- 影响：
+  1. 多个页面同时渲染时，可能产生重复请求；
+  2. 数据一致性依赖后端最新状态，不适合乐观更新；
+  3. 如果后续数据量增加或字段变复杂，每个页面仍需自己写 loading/error/空态处理。
+- 当前是否需要立即修：否，v0.9 最小稳定版接受此设计。
+- 后续建议：
+  - 引入 Zustand 前先明确：哪些状态全局共享、哪些只在页面内、哪些需要缓存、缓存过期策略是什么；
+  - 先做状态清单，再迁移到 store，不要为了用 Zustand 而用 Zustand。
+
+## 问题 141：任务状态采用 3 秒客户端轮询而非推送
+
+- 位置：`mobile-app/src/screens/TaskStatusScreen.tsx`
+- 类型：性能与实时性平衡
+- 现象：任务状态使用 setInterval 每 3 秒拉一次，completed/failed 后停止。
+- 影响：
+  1. 小任务通常很快完成，轮询开销可以接受；
+  2. 如果用户长时间停留在任务页，持续 3 秒请求一次，会有少量服务端压力；
+  3. 多 Tab 或多设备同时看同一个任务时，各自独立轮询。
+- 当前是否需要立即修：否，当前任务大多同步完成，轮询大多只跑 1 轮即停止。
+- 后续建议：
+  - 如果后续分析任务真的变长（> 10 秒）或支持批量任务，再考虑后端主动推送或更轻的轮询策略；
+  - 页面失焦时也可暂停轮询以节省资源。
 
 ## 问题 133：MetricRow 对长 value 的布局承载仍需实机观察
 

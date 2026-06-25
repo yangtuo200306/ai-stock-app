@@ -5,6 +5,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { apiGet } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useDataRefresh } from '../contexts/DataRefreshContext';
+import { useApiErrorHandler } from '../hooks/useApiErrorHandler';
 import type { RecordItem, RecordStackParamList, RootTabParamList } from '../types';
 import { AppCard } from '../components/AppCard';
 import { LoginRequiredView } from '../components/LoginRequiredView';
@@ -22,6 +24,8 @@ export default function RecordListScreen() {
   const navigation = useNavigation<NavigationType>();
   const tabNavigation = useNavigation<TabNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
+  const { recordsVersion } = useDataRefresh();
+  const { handleError } = useApiErrorHandler();
   const [items, setItems] = useState<RecordItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -36,15 +40,16 @@ export default function RecordListScreen() {
       const data = await apiGet('/api/records');
       setItems(data.items ?? []);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : '加载记录失败，请检查后端服务是否启动');
+      const { message } = handleError(err, '加载记录失败，请检查后端服务是否启动');
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }, [authLoading, isLoggedIn]);
+  }, [authLoading, isLoggedIn, handleError]);
 
   useEffect(() => {
     fetchRecords();
-  }, [fetchRecords]);
+  }, [fetchRecords, recordsVersion]);
 
   if (authLoading) {
     return <StateView type="loading" />;

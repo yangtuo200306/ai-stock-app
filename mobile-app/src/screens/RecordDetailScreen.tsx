@@ -3,10 +3,11 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
-import { useNavigation as useTabNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { apiGet } from '../api/client';
-import type { RecordDetail as RecordDetailType, RecordStackParamList } from '../types';
+import type { RecordDetail as RecordDetailType, RecordStackParamList, RootTabParamList } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useApiErrorHandler } from '../hooks/useApiErrorHandler';
 import { AppButton } from '../components/AppButton';
 import { AppCard } from '../components/AppCard';
 import { LoginRequiredView } from '../components/LoginRequiredView';
@@ -21,12 +22,14 @@ import { formatChangePct, getChangeColor } from '../utils/stockDisplay';
 
 type RouteType = RouteProp<RecordStackParamList, 'RecordDetail'>;
 type NavProp = NativeStackNavigationProp<RecordStackParamList, 'RecordDetail'>;
+type TabNavProp = BottomTabNavigationProp<RootTabParamList>;
 
 export default function RecordDetailScreen() {
   const route = useRoute<RouteType>();
   const navigation = useNavigation<NavProp>();
-  const tabNavigation = useTabNavigation<any>();
+  const tabNavigation = useNavigation<TabNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
+  const { handleError } = useApiErrorHandler();
   const { recordId } = route.params;
   const [record, setRecord] = useState<RecordDetailType | null>(null);
   const [error, setError] = useState('');
@@ -42,9 +45,10 @@ export default function RecordDetailScreen() {
         setError(data.message || '记录不存在');
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : '获取记录失败');
+      const { message } = handleError(err, '获取记录失败');
+      setError(message);
     }
-  }, [authLoading, isLoggedIn, recordId]);
+  }, [authLoading, isLoggedIn, recordId, handleError]);
 
   useEffect(() => {
     fetchRecord();
@@ -160,7 +164,7 @@ export default function RecordDetailScreen() {
             variant="secondary"
             onPress={() =>
               tabNavigation.navigate('问股', {
-                sessionId: record.session_id,
+                sessionId: record.session_id ?? undefined,
                 initialMessages: record.messages ?? [],
               })
             }

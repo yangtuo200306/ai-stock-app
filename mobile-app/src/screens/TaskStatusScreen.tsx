@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -6,6 +6,8 @@ import type { RouteProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { apiGet } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useDataRefresh } from '../contexts/DataRefreshContext';
+import { useApiErrorHandler } from '../hooks/useApiErrorHandler';
 import type { AnalysisTask, WatchlistStackParamList, RootTabParamList } from '../types';
 import { AppButton } from '../components/AppButton';
 import { AppCard } from '../components/AppCard';
@@ -16,6 +18,8 @@ import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { getTaskStatusColor, getTaskStatusLabel } from '../utils/taskStatusDisplay';
 
+const POLL_INTERVAL_MS = 3000;
+
 type RouteType = RouteProp<WatchlistStackParamList, 'TaskStatus'>;
 type NavProp = NativeStackNavigationProp<WatchlistStackParamList, 'TaskStatus'>;
 type TabNavProp = BottomTabNavigationProp<RootTabParamList>;
@@ -25,9 +29,21 @@ export default function TaskStatusScreen() {
   const navigation = useNavigation<NavProp>();
   const tabNavigation = useNavigation<TabNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
+  const { notifyTasksChanged, notifyRecordsChanged, notifyWatchlistChanged } = useDataRefresh();
+  const { handleError } = useApiErrorHandler();
   const { taskId, stockCode } = route.params;
   const [task, setTask] = useState<AnalysisTask | null>(null);
   const [error, setError] = useState('');
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const taskRef = useRef(task);
+  taskRef.current = task;
+
+  const stopPolling = useCallback(() => {
+    if (intervalRef.current !== null) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
   const fetchTask = useCallback(async () => {
     if (authLoading || !isLoggedIn) return;
@@ -35,19 +51,59 @@ export default function TaskStatusScreen() {
     try {
       const data = await apiGet(`/api/analysis/${taskId}`);
       if (data.task_id) {
-        setTask(data as AnalysisTask);
+        const currentTask = data as AnalysisTask;
+        setTask(currentTask);
         setError('');
+
+        notifyTasksChanged();
+
+        if (currentTask.status === 'completed' || currentTask.status === 'failed') {
+          stopPolling();
+        }
+
+        if (currentTask.status === 'completed' && currentTask.report_id) {
+          notifyRecordsChanged();
+          notifyWatchlistChanged();
+        }
       } else {
         setError('任务不存在');
+        stopPolling();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : '查询任务状态失败');
+      const { message } = handleError(err, '查询任务状态失败');
+      setError(message);
+      stopPolling();
     }
-  }, [authLoading, isLoggedIn, taskId]);
+  }, [authLoading, isLoggedIn, taskId, notifyTasksChanged, notifyRecordsChanged, notifyWatchlistChanged, handleError, stopPolling]);
 
   useEffect(() => {
     fetchTask();
   }, [fetchTask]);
+
+  useEffect(() => {
+    if (authLoading || !isLoggedIn) {
+      stopPolling();
+      return;
+    }
+
+    if (task && (task.status === 'completed' || task.status === 'failed')) {
+      stopPolling();
+      return;
+    }
+
+    intervalRef.current = setInterval(() => {
+      const current = taskRef.current;
+      if (current && (current.status === 'completed' || current.status === 'failed')) {
+        stopPolling();
+        return;
+      }
+      fetchTask();
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      stopPolling();
+    };
+  }, [authLoading, isLoggedIn, task?.status, fetchTask, stopPolling]);
 
   if (authLoading) {
     return <StateView type="loading" />;
