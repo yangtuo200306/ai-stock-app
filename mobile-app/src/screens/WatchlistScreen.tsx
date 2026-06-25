@@ -137,12 +137,16 @@ export default function WatchlistScreen() {
           });
           notifyWatchlistChanged();
           notifyTasksChanged();
+          
+          // 直接触发当前页重新加载，确保列表刷新
+          await loadStocks();
+          await loadTaskStatuses();
         }
       } catch (err: unknown) {
         Alert.alert('错误', err instanceof Error ? err.message : '删除自选股失败');
       }
     },
-    [notifyWatchlistChanged, notifyTasksChanged],
+    [notifyWatchlistChanged, notifyTasksChanged, loadStocks, loadTaskStatuses],
   );
 
   const handleCreateAnalysis = useCallback(
