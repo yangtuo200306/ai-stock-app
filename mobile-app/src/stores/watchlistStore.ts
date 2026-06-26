@@ -21,6 +21,7 @@ interface WatchlistState {
   taskStatuses: Record<string, string>;
   isLoading: boolean;
   loadError: string;
+  searchQuery: string;
 }
 
 interface WatchlistActions {
@@ -30,6 +31,8 @@ interface WatchlistActions {
   deleteStock: (code: string) => Promise<boolean>;
   createAnalysis: (stockCode: string) => Promise<string | null>;
   updateTaskStatus: (code: string, status: string) => void;
+  setSearchQuery: (query: string) => void;
+  getFilteredStocks: (query: string) => Stock[];
   reset: () => void;
 }
 
@@ -38,6 +41,7 @@ const initialState: WatchlistState = {
   taskStatuses: {},
   isLoading: false,
   loadError: '',
+  searchQuery: '',
 };
 
 export const useWatchlistStore = create<WatchlistState & WatchlistActions>((set, get) => ({
@@ -125,6 +129,19 @@ export const useWatchlistStore = create<WatchlistState & WatchlistActions>((set,
     set((state) => ({
       taskStatuses: { ...state.taskStatuses, [code]: status },
     }));
+  },
+
+  setSearchQuery: (query: string) => {
+    set({ searchQuery: query });
+  },
+
+  getFilteredStocks: (query: string) => {
+    const { stocks } = get();
+    if (!query.trim()) return stocks;
+    const lower = query.trim().toLowerCase();
+    return stocks.filter(
+      (s) => s.code.toLowerCase().includes(lower) || s.name.toLowerCase().includes(lower),
+    );
   },
 
   reset: () => set(initialState),

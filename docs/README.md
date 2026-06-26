@@ -85,9 +85,15 @@ ai-stock-app/
 | v0.8 | 公共 UI 组件、主题系统、统一状态展示 |
 | v0.9 | 刷新信号层、结构化 ApiError、统一 401 处理、任务轮询 |
 | v1.0 | 阶段一架构升级：前端 Zustand 状态管理 + 后端配置/日志/错误码/数据库迁移 |
+| v1.1 | 阶段二：问股页精修（布局重构、交互增强、视觉升级） |
+| v1.2 | 阶段二：自选页精修（搜索过滤、Pull-to-Refresh、删除确认、卡片升级） |
+| v1.3 | 阶段二：记录页精修（搜索过滤、RecordCard、详情页视觉升级） |
+| v1.4 | 阶段二：我的页精修（头像区、可折叠开发者设置、版本常量、登录页视觉升级） |
+| v1.5 | 阶段二：公共组件收口（AppButton compact 变体、StateView 紧凑按钮、RecordCard 颜色统一） |
 
 ## 文档索引
 
 - [代码问题与隐患记录](code-review-notes.md) — 已发现的 145 个问题及状态汇总
 - [常见问题与排查手册](common-issues.md) — 开发中反复遇到的问题及解决方式
-- [历史文档归档](archive/) — v0.1~v0.9 的计划、总结和学习笔记
+- [历史文档归档](archive/) — v0.1~v1.5 的计划、总结和学习笔记
+  - 版本总结：v0.1~v0.9、[v1.0](archive/releases/v1.0-summary.md)、[v1.1](archive/releases/v1.1-summary.md)、[v1.2](archive/releases/v1.2-summary.md)、[v1.3](archive/releases/v1.3-summary.md)、[v1.4](archive/releases/v1.4-summary.md)、[v1.5](archive/releases/v1.5-summary.md)

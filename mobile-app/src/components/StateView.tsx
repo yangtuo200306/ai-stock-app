@@ -36,7 +36,7 @@ export function StateView({
       <Text style={styles.title}>{title ?? defaultTitles[type]}</Text>
       {description ? <Text style={styles.description}>{description}</Text> : null}
       {actionLabel && onActionPress ? (
-        <AppButton title={actionLabel} onPress={onActionPress} style={styles.action} />
+        <AppButton title={actionLabel} onPress={onActionPress} size="compact" style={styles.action} />
       ) : null}
     </View>
   );

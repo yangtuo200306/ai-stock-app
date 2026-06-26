@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { AppButton } from '../components/AppButton';
@@ -67,6 +67,8 @@ export default function LoginScreen() {
           autoCorrect={false}
         />
 
+        <View style={styles.inputDivider} />
+
         <TextInput
           style={styles.input}
           value={password}
@@ -77,17 +79,24 @@ export default function LoginScreen() {
         />
 
         {mode === 'register' && (
-          <TextInput
-            style={styles.input}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder="确认密码"
-            placeholderTextColor={colors.textSubtle}
-            secureTextEntry
-          />
+          <>
+            <View style={styles.inputDivider} />
+            <TextInput
+              style={styles.input}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="确认密码"
+              placeholderTextColor={colors.textSubtle}
+              secureTextEntry
+            />
+          </>
         )}
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error ? (
+          <View style={styles.errorBadge}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
 
         <AppButton
           title={mode === 'login' ? '登录' : '注册'}
@@ -97,14 +106,17 @@ export default function LoginScreen() {
           style={styles.submitButton}
         />
 
-        <AppButton
-          title={mode === 'login' ? '没有账号？点击注册' : '已有账号？点击登录'}
-          variant="ghost"
+        <Pressable
+          style={styles.switchButton}
           onPress={() => {
             setMode(mode === 'login' ? 'register' : 'login');
             setError('');
           }}
-        />
+        >
+          <Text style={styles.switchButtonText}>
+            {mode === 'login' ? '还没有账号？去注册' : '已有账号？去登录'}
+          </Text>
+        </Pressable>
       </AppCard>
     </View>
   );
@@ -135,15 +147,34 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.buttonVertical,
     fontSize: 16,
     color: colors.textPrimary,
-    marginBottom: spacing.md,
+  },
+  inputDivider: {
+    height: spacing.md,
   },
   submitButton: {
     marginBottom: spacing.md,
   },
+  errorBadge: {
+    backgroundColor: 'rgba(255, 77, 79, 0.08)',
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    alignItems: 'center',
+  },
   errorText: {
     ...typography.helper,
     color: colors.danger,
-    marginBottom: spacing.md,
     textAlign: 'center',
+  },
+  switchButton: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  switchButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.textMuted,
+    lineHeight: 20,
   },
 });

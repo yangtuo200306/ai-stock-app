@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
@@ -19,6 +21,8 @@ from app.services.market_data import MarketDataError, get_stock_history, get_sto
 from app.services.report_builder import build_analysis_report
 from app.services.stock_resolver import get_supported_names, resolve_stock_input
 from app.services.technical_indicators import build_technical_indicators
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["ask"])
 

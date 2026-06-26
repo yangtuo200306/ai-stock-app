@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 import { resetAllStores } from '../stores';
 import type { MineStackParamList } from '../types';
 import { STORAGE_KEYS } from '../api/client';
-import { AppButton } from '../components/AppButton';
-import { AppCard } from '../components/AppCard';
+import { APP_NAME, APP_VERSION } from '../constants/app';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -21,6 +20,7 @@ export default function MineScreen() {
   const [backendUrl, setBackendUrl] = useState('');
   const [savedBackendUrl, setSavedBackendUrl] = useState('');
   const [message, setMessage] = useState('暂未操作');
+  const [devExpanded, setDevExpanded] = useState(false);
 
   useEffect(() => {
     const loadSavedBackendUrl = async () => {
@@ -74,54 +74,79 @@ export default function MineScreen() {
     }
   };
 
+  const avatarLetter = (username || '?').charAt(0).toUpperCase();
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>我的</Text>
-
-      <AppCard style={styles.card}>
-        <Text style={styles.sectionTitle}>账号</Text>
-        {isLoggedIn ? (
-          <View style={styles.sectionBody}>
-            <Text style={styles.usernameText}>当前用户：{username}</Text>
-            <AppButton title="退出登录" variant="danger" onPress={handleLogout} />
-          </View>
-        ) : (
-          <View style={styles.sectionBody}>
-            <Text style={styles.placeholder}>未登录</Text>
-            <AppButton title="登录 / 注册" onPress={() => navigation.navigate('Login')} />
-          </View>
-        )}
-      </AppCard>
-
-      <AppCard style={styles.card}>
-        <Text style={styles.sectionTitle}>应用信息</Text>
-        <Text style={styles.infoText}>当前版本：v1.0</Text>
-        <Text style={styles.infoText}>当前能力：前端架构升级（Zustand 状态管理）</Text>
-      </AppCard>
-
-      <AppCard style={styles.card}>
-        <Text style={styles.sectionTitle}>后端地址配置</Text>
-
-        <TextInput
-          style={styles.input}
-          value={backendUrl}
-          onChangeText={setBackendUrl}
-          placeholder="http://127.0.0.1:8000"
-          placeholderTextColor={colors.textSubtle}
-          autoCapitalize="none"
-        />
-
-        <Text style={styles.example}>示例：http://127.0.0.1:8000</Text>
-
-        <View style={styles.buttonGroup}>
-          <AppButton title="保存地址" onPress={handleSave} />
-          <AppButton title="测试连接" variant="secondary" onPress={handleTestConnection} />
+      {/* User avatar section */}
+      <View style={styles.avatarSection}>
+        <View style={styles.avatarCircle}>
+          <Text style={styles.avatarLetter}>{avatarLetter}</Text>
         </View>
+        <Text style={styles.usernameText}>{isLoggedIn ? username : '未登录'}</Text>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusDot, isLoggedIn ? styles.statusDotOnline : styles.statusDotOffline]} />
+          <Text style={[styles.statusLabel, isLoggedIn ? styles.statusLabelOnline : styles.statusLabelOffline]}>
+            {isLoggedIn ? '已登录' : '未登录'}
+          </Text>
+        </View>
+      </View>
 
-        <Text style={styles.currentValue}>当前输入：{backendUrl || '暂未输入'}</Text>
-        <Text style={styles.savedValue}>已保存地址：{savedBackendUrl || '暂未保存'}</Text>
-        <Text style={styles.message}>操作提示：{message}</Text>
-      </AppCard>
+      {/* Account action */}
+      <View style={styles.actionSection}>
+        {isLoggedIn ? (
+          <Pressable style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>退出登录</Text>
+          </Pressable>
+        ) : (
+          <Pressable style={styles.loginButton} onPress={() => navigation.navigate('Login')}>
+            <Text style={styles.loginButtonText}>登录 / 注册</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* App info section */}
+      <View style={styles.infoCard}>
+        <Text style={styles.infoAppName}>{APP_NAME}</Text>
+        <Text style={styles.infoVersion}>版本 {APP_VERSION}</Text>
+        <Text style={styles.infoDesc}>基于 AI 的股票分析工具，支持问股、自选分析、历史记录管理。</Text>
+      </View>
+
+      {/* Developer settings - collapsible */}
+      <View style={styles.devCard}>
+        <Pressable style={styles.devHeader} onPress={() => setDevExpanded(!devExpanded)}>
+          <Text style={styles.devToggle}>{devExpanded ? '▼' : '▶'}</Text>
+          <Text style={styles.devTitle}>开发者设置</Text>
+        </Pressable>
+
+        {devExpanded ? (
+          <View style={styles.devBody}>
+            <TextInput
+              style={styles.devInput}
+              value={backendUrl}
+              onChangeText={setBackendUrl}
+              placeholder="http://127.0.0.1:8000"
+              placeholderTextColor={colors.textSubtle}
+              autoCapitalize="none"
+            />
+
+            <Text style={styles.devExample}>示例：http://127.0.0.1:8000</Text>
+
+            <View style={styles.devButtonGroup}>
+              <Pressable style={styles.devSaveButton} onPress={handleSave}>
+                <Text style={styles.devSaveButtonText}>保存地址</Text>
+              </Pressable>
+              <Pressable style={styles.devTestButton} onPress={handleTestConnection}>
+                <Text style={styles.devTestButtonText}>测试连接</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.devCurrentValue}>当前输入：{backendUrl || '暂未输入'}</Text>
+            <Text style={styles.devSavedValue}>已保存地址：{savedBackendUrl || '暂未保存'}</Text>
+            <Text style={styles.devMessage}>操作提示：{message}</Text>
+          </View>
+        ) : null}
+      </View>
     </ScrollView>
   );
 }
@@ -135,38 +160,152 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
     gap: spacing.sectionGap,
   },
-  title: {
-    ...typography.pageTitle,
-    color: colors.textPrimary,
-    textAlign: 'center',
+
+  /* Avatar section */
+  avatarSection: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
   },
-  card: {
-    maxWidth: 420,
-    alignSelf: 'center',
-  },
-  sectionTitle: {
-    ...typography.sectionTitle,
-    color: colors.textPrimary,
+  avatarCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  sectionBody: {
-    alignItems: 'center',
-    gap: spacing.md,
+  avatarLetter: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    lineHeight: 34,
   },
   usernameText: {
-    ...typography.bodyStrong,
+    ...typography.sectionTitle,
     color: colors.textPrimary,
+    marginBottom: spacing.xs,
   },
-  placeholder: {
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusDotOnline: {
+    backgroundColor: colors.success,
+  },
+  statusDotOffline: {
+    backgroundColor: colors.textSubtle,
+  },
+  statusLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 19,
+  },
+  statusLabelOnline: {
+    color: colors.success,
+  },
+  statusLabelOffline: {
+    color: colors.textSubtle,
+  },
+
+  /* Action section */
+  actionSection: {
+    alignItems: 'center',
+    paddingBottom: spacing.sm,
+  },
+  loginButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    minWidth: 160,
+    alignItems: 'center',
+  },
+  loginButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    lineHeight: 22,
+  },
+  logoutButton: {
+    backgroundColor: colors.danger,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    minWidth: 160,
+    alignItems: 'center',
+  },
+  logoutButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    lineHeight: 22,
+  },
+
+  /* App info section */
+  infoCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.cardPadding,
+    alignItems: 'center',
+  },
+  infoAppName: {
+    ...typography.pageTitle,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  infoVersion: {
     ...typography.body,
     color: colors.textMuted,
-  },
-  infoText: {
-    ...typography.body,
-    color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
-  input: {
+  infoDesc: {
+    ...typography.helper,
+    color: colors.textSubtle,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
+  /* Developer settings */
+  devCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  devHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.cardPadding,
+    gap: spacing.sm,
+  },
+  devToggle: {
+    fontSize: 12,
+    color: colors.textMuted,
+    lineHeight: 17,
+    width: 14,
+  },
+  devTitle: {
+    ...typography.sectionTitle,
+    color: colors.textPrimary,
+  },
+  devBody: {
+    paddingHorizontal: spacing.cardPadding,
+    paddingBottom: spacing.cardPadding,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.md,
+  },
+  devInput: {
     borderWidth: 1,
     borderColor: colors.borderStrong,
     borderRadius: 12,
@@ -176,26 +315,55 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
-  example: {
+  devExample: {
     ...typography.helper,
     color: colors.textMuted,
     marginBottom: spacing.lg,
   },
-  buttonGroup: {
+  devButtonGroup: {
+    flexDirection: 'row',
     gap: spacing.sm,
     marginBottom: spacing.lg,
   },
-  currentValue: {
+  devSaveButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  devSaveButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    lineHeight: 20,
+  },
+  devTestButton: {
+    flex: 1,
+    backgroundColor: colors.surfaceMuted,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  devTestButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    lineHeight: 20,
+  },
+  devCurrentValue: {
     ...typography.helper,
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  savedValue: {
+  devSavedValue: {
     ...typography.helper,
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  message: {
+  devMessage: {
     ...typography.helper,
     color: colors.primary,
   },

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
@@ -8,7 +8,6 @@ import { apiGet } from '../api/client';
 import type { RecordDetail as RecordDetailType, RecordStackParamList, RootTabParamList } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useApiErrorHandler } from '../hooks/useApiErrorHandler';
-import { AppButton } from '../components/AppButton';
 import { AppCard } from '../components/AppCard';
 import { LoginRequiredView } from '../components/LoginRequiredView';
 import { MessageBubble } from '../components/MessageBubble';
@@ -55,6 +54,7 @@ export default function RecordDetailScreen() {
   }, [fetchRecord]);
 
   const displayTime = record?.updated_at || record?.created_at;
+  const typeColor = record ? getRecordTypeColor(record.record_type) : colors.textMuted;
 
   if (authLoading) {
     return <StateView type="loading" />;
@@ -82,103 +82,124 @@ export default function RecordDetailScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <AppCard style={styles.card}>
-        <View style={styles.typeBadge}>
-          <Text style={[styles.typeLabel, { color: getRecordTypeColor(record.record_type) }]}>
+        {/* Type bar + badge */}
+        <View style={styles.typeBarRow}>
+          <View style={[styles.typeBar, { backgroundColor: typeColor }]} />
+          <Text style={[styles.typeBadge, { color: typeColor, backgroundColor: colors.surfaceMuted }]}>
             {getRecordTypeLabel(record.record_type)}
           </Text>
         </View>
-        <Text style={styles.stockName}>
-          {record.stock_name}（{record.stock_code}）
-        </Text>
 
+        {/* Stock name + code */}
+        <View style={styles.stockRow}>
+          <Text style={styles.stockName}>{record.stock_name}</Text>
+          <Text style={styles.stockCode}>{record.stock_code}</Text>
+        </View>
+
+        {/* Messages section (ask type) */}
         {record.record_type === 'ask' && record.messages && record.messages.length > 0 ? (
-          <View style={styles.messagesContainer}>
-            {record.messages.map((msg, index) => (
-              <MessageBubble
-                key={`${msg.id}-${index}`}
-                role={msg.role}
-                content={msg.content}
-                answerType={msg.answer_type}
-              />
-            ))}
+          <View style={styles.sectionBlock}>
+            <Text style={styles.sectionLabel}>对话</Text>
+            <View style={styles.messagesContainer}>
+              {record.messages.map((msg, index) => (
+                <MessageBubble
+                  key={`${msg.id}-${index}`}
+                  role={msg.role}
+                  content={msg.content}
+                  answerType={msg.answer_type}
+                />
+              ))}
+            </View>
           </View>
         ) : null}
 
+        {/* Legacy ask fields (no messages) */}
         {record.record_type === 'ask' && (!record.messages || record.messages.length === 0) ? (
-          <>
+          <View style={styles.sectionBlock}>
             {record.question ? (
               <>
-                <Text style={styles.sectionTitle}>问题</Text>
+                <Text style={styles.sectionLabel}>问题</Text>
                 <MessageBubble role="user" content={record.question} />
               </>
             ) : null}
 
             {record.answer ? (
               <>
-                <Text style={styles.sectionTitle}>
+                <Text style={styles.sectionLabel}>
                   {record.answer_type === 'ai' ? 'AI 回答' : '规则回退回答'}
                 </Text>
                 <MessageBubble role="assistant" content={record.answer} answerType={record.answer_type} />
               </>
             ) : null}
-          </>
+          </View>
         ) : null}
 
+        {/* Summary section (report/analysis type) */}
         {record.record_type === 'report' || record.record_type === 'analysis' ? (
-          <>
-            <Text style={styles.sectionTitle}>摘要</Text>
+          <View style={styles.sectionBlock}>
+            <Text style={styles.sectionLabel}>摘要</Text>
             <Text style={styles.summaryText}>{record.summary}</Text>
-          </>
+          </View>
         ) : null}
 
-        <View style={styles.metricsSection}>
-          {record.metadata.price != null && (
-            <MetricRow label="当前价" value={record.metadata.price} style={styles.metricRow} />
-          )}
+        {/* Market metrics section */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionLabel}>行情摘要</Text>
+          <View style={styles.metricsSection}>
+            {record.metadata.price != null && (
+              <MetricRow label="当前价" value={record.metadata.price} style={styles.metricRow} />
+            )}
 
-          {record.metadata.change_pct != null && (
-            <MetricRow
-              label="涨跌幅"
-              value={formatChangePct(record.metadata.change_pct)}
-              valueColor={getChangeColor(record.metadata.change_pct)}
-              style={styles.metricRow}
-            />
-          )}
+            {record.metadata.change_pct != null && (
+              <MetricRow
+                label="涨跌幅"
+                value={formatChangePct(record.metadata.change_pct)}
+                valueColor={getChangeColor(record.metadata.change_pct)}
+                style={styles.metricRow}
+              />
+            )}
 
-          {record.metadata.score != null && (
-            <MetricRow label="评分" value={record.metadata.score} style={styles.metricRow} />
-          )}
+            {record.metadata.score != null && (
+              <MetricRow label="评分" value={record.metadata.score} style={styles.metricRow} />
+            )}
 
-          {record.metadata.action != null && (
-            <MetricRow label="建议" value={record.metadata.action} style={styles.metricRow} />
-          )}
+            {record.metadata.action != null && (
+              <MetricRow label="建议" value={record.metadata.action} style={styles.metricRow} />
+            )}
 
-          {record.metadata.trend != null && (
-            <MetricRow label="趋势" value={record.metadata.trend} style={styles.metricRow} />
-          )}
+            {record.metadata.trend != null && (
+              <MetricRow label="趋势" value={record.metadata.trend} style={styles.metricRow} />
+            )}
+          </View>
         </View>
 
-        {record.record_type === 'ask' && record.session_id && (
-          <AppButton
-            title="继续追问"
-            variant="secondary"
-            onPress={() =>
-              tabNavigation.navigate('问股', {
-                sessionId: record.session_id ?? undefined,
-                initialMessages: record.messages ?? [],
-              })
-            }
-            style={styles.actionButton}
-          />
-        )}
+        {/* Action buttons */}
+        <View style={styles.actionRow}>
+          {record.record_type === 'ask' && record.session_id ? (
+            <Pressable
+              style={[styles.actionButton, styles.askAiButton]}
+              onPress={() =>
+                tabNavigation.navigate('问股', {
+                  sessionId: record.session_id ?? undefined,
+                  initialMessages: record.messages ?? [],
+                })
+              }
+            >
+              <Text style={styles.askAiIcon}>→</Text>
+              <Text style={styles.askAiLabel}>继续追问</Text>
+            </Pressable>
+          ) : null}
 
-        {record.report_id != null && (
-          <AppButton
-            title="查看完整报告"
-            onPress={() => navigation.navigate('ReportDetail', { reportId: record.report_id! })}
-            style={styles.actionButton}
-          />
-        )}
+          {record.report_id != null ? (
+            <Pressable
+              style={[styles.actionButton, styles.reportButton]}
+              onPress={() => navigation.navigate('ReportDetail', { reportId: record.report_id! })}
+            >
+              <Text style={styles.reportIcon}>→</Text>
+              <Text style={styles.reportLabel}>查看完整报告</Text>
+            </Pressable>
+          ) : null}
+        </View>
 
         <Text style={styles.dateText}>{displayTime}</Text>
       </AppCard>
@@ -205,42 +226,110 @@ const styles = StyleSheet.create({
     maxWidth: 560,
     alignSelf: 'center',
   },
-  typeBadge: {
-    marginBottom: spacing.xs,
+  typeBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
-  typeLabel: {
-    ...typography.label,
-    marginBottom: spacing.xs,
+  typeBar: {
+    width: 4,
+    height: 20,
+    borderRadius: 2,
+  },
+  typeBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 16,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  stockRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
   stockName: {
     ...typography.pageTitle,
     color: colors.textPrimary,
+  },
+  stockCode: {
+    fontSize: 14,
+    fontWeight: '400',
+    lineHeight: 22,
+    color: colors.textMuted,
+    fontFamily: 'monospace',
+  },
+  sectionBlock: {
     marginBottom: spacing.lg,
+  },
+  sectionLabel: {
+    ...typography.label,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   messagesContainer: {
-    marginBottom: spacing.lg,
-  },
-  sectionTitle: {
-    ...typography.sectionTitle,
-    color: colors.textPrimary,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
+    marginBottom: 0,
   },
   summaryText: {
     ...typography.longText,
     color: colors.textSecondary,
-    marginBottom: spacing.md,
   },
   metricsSection: {
-    marginTop: spacing.sm,
+    marginTop: 0,
   },
   metricRow: {
     borderBottomWidth: 1,
     borderBottomColor: colors.surfaceMuted,
     paddingVertical: spacing.md,
   },
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
   actionButton: {
-    marginTop: spacing.lg,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  askAiButton: {
+    backgroundColor: colors.secondarySoft,
+    borderColor: colors.secondarySoft,
+  },
+  askAiIcon: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  askAiLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.secondary,
+    lineHeight: 20,
+  },
+  reportButton: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primarySoft,
+  },
+  reportIcon: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  reportLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    lineHeight: 20,
   },
   dateText: {
     ...typography.helper,

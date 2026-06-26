@@ -12,11 +12,13 @@ import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 
 type AppButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+type AppButtonSize = 'default' | 'compact';
 
 type AppButtonProps = {
   title: string;
   onPress?: () => void;
   variant?: AppButtonVariant;
+  size?: AppButtonSize;
   loading?: boolean;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -60,6 +62,7 @@ export function AppButton({
   title,
   onPress,
   variant = 'primary',
+  size = 'default',
   loading = false,
   disabled = false,
   style,
@@ -70,26 +73,47 @@ export function AppButton({
     <Pressable
       onPress={isDisabled ? undefined : onPress}
       disabled={isDisabled}
-      style={[styles.button, getButtonStyle(variant, isDisabled), style]}
+      style={[
+        styles.base,
+        size === 'compact' ? styles.compact : styles.default,
+        getButtonStyle(variant, isDisabled),
+        style,
+      ]}
     >
       {loading ? (
         <ActivityIndicator color={variant === 'ghost' ? colors.primary : colors.textInverse} />
       ) : (
-        <Text style={[styles.text, getTextStyle(variant, isDisabled)]}>{title}</Text>
+        <Text
+          style={[
+            styles.text,
+            size === 'compact' ? styles.compactText : styles.defaultText,
+            getTextStyle(variant, isDisabled),
+          ]}
+        >
+          {title}
+        </Text>
       )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
+  base: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  default: {
     minHeight: 42,
     borderRadius: 12,
     paddingVertical: spacing.buttonVertical,
     paddingHorizontal: spacing.buttonHorizontal,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
+  },
+  compact: {
+    minHeight: 36,
+    borderRadius: 10,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   primaryButton: {
     backgroundColor: colors.primary,
@@ -112,7 +136,14 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   text: {
+    fontWeight: '600',
+  },
+  defaultText: {
     ...typography.bodyStrong,
+  },
+  compactText: {
+    fontSize: 14,
+    lineHeight: 20,
   },
   solidText: {
     color: colors.textInverse,

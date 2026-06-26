@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -7,7 +17,6 @@ import type { RootTabParamList } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useAskStore } from '../stores/askStore';
 import { AppButton } from '../components/AppButton';
-import { AppCard } from '../components/AppCard';
 import { LoginRequiredView } from '../components/LoginRequiredView';
 import { MessageBubble } from '../components/MessageBubble';
 import { MetricRow } from '../components/MetricRow';
@@ -20,6 +29,13 @@ import { formatChangePct, getChangeColor } from '../utils/stockDisplay';
 type AskRouteProp = RouteProp<RootTabParamList, '问股'>;
 type AskTabNavProp = BottomTabNavigationProp<RootTabParamList>;
 
+const QUICK_QUESTIONS = [
+  { label: '分析 600519', question: '600519 怎么看？' },
+  { label: '茅台现在能买吗', question: '贵州茅台现在能买吗？' },
+  { label: '宁德时代趋势', question: '宁德时代趋势如何？' },
+  { label: '分析比亚迪', question: '比亚迪怎么样？' },
+];
+
 export default function AskScreen() {
   const route = useRoute<AskRouteProp>();
   const navigation = useNavigation<AskTabNavProp>();
@@ -30,6 +46,7 @@ export default function AskScreen() {
   } = useAskStore();
   const [addToWatchlistLoading, setAddToWatchlistLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null);
   const initialParamsHandled = useRef(false);
 
   useEffect(() => {
@@ -46,10 +63,43 @@ export default function AskScreen() {
     initialParamsHandled.current = true;
   }, [route.params, setQuestion, restoreSession]);
 
+  const scrollToEnd = useCallback(() => {
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, []);
+
+  useEffect(() => {
+    if (messages.length > 0 || latestResult) {
+      scrollToEnd();
+    }
+  }, [messages.length, latestResult, scrollToEnd]);
+
   const onNewSession = useCallback(() => {
     handleNewSession();
     initialParamsHandled.current = false;
   }, [handleNewSession]);
+
+  const onAsk = useCallback(() => {
+    handleAsk().then(() => {
+      scrollToEnd();
+    });
+  }, [handleAsk, scrollToEnd]);
+
+  const onQuickQuestion = useCallback((q: string) => {
+    setQuestion(q);
+    setTimeout(() => {
+      handleAsk().then(() => {
+        scrollToEnd();
+      });
+    }, 50);
+  }, [setQuestion, handleAsk, scrollToEnd]);
+
+  const onRetry = useCallback(() => {
+    handleAsk().then(() => {
+      scrollToEnd();
+    });
+  }, [handleAsk, scrollToEnd]);
 
   const onAddToWatchlist = useCallback(async () => {
     setAddToWatchlistLoading(true);
@@ -57,7 +107,7 @@ export default function AskScreen() {
     if (result) {
       Alert.alert('提示', '已加入自选');
     } else {
-      Alert.alert('提示', '加入自选失败，请检查后端服务');
+      Alert.alert('提示', '加入自选失败，请稍后重试');
     }
     setAddToWatchlistLoading(false);
   }, [handleAddToWatchlist]);
@@ -77,132 +127,207 @@ export default function AskScreen() {
     );
   }
 
+  const hasContent = messages.length > 0 || latestResult;
+
   return (
-    <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.container} ref={scrollRef}>
-      <AppCard style={styles.card}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerTextGroup}>
-            <Text style={styles.title}>问股</Text>
-            <Text style={styles.description}>输入股票问题，查看 AI 分析</Text>
-          </View>
-          {(sessionId || messages.length > 0) && (
-            <AppButton
-              title="新建会话"
-              variant="ghost"
-              onPress={onNewSession}
-              style={styles.newSessionButton}
-            />
-          )}
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTextGroup}>
+          <Text style={styles.title}>问股</Text>
+          <Text style={styles.description}>输入股票问题，查看 AI 分析</Text>
         </View>
+        {(sessionId || messages.length > 0) && (
+          <AppButton
+            title="新建会话"
+            variant="ghost"
+            onPress={onNewSession}
+            style={styles.newSessionButton}
+          />
+        )}
+      </View>
 
-        <TextInput
-          style={styles.input}
-          value={question}
-          onChangeText={setQuestion}
-          placeholder="例如：600519 怎么看？"
-          placeholderTextColor={colors.textSubtle}
-        />
-
-        <AppButton
-          title={isLoading ? '分析中...' : '发送'}
-          onPress={handleAsk}
-          loading={isLoading}
-          disabled={isLoading}
-          style={styles.submitButton}
-        />
-
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-        {messages.length > 0 ? (
-          <View style={styles.messagesContainer}>
-            {messages.map((msg, index) => (
-              <MessageBubble
-                key={`${msg.id}-${index}`}
-                role={msg.role}
-                content={msg.content}
-                answerType={msg.answer_type}
-              />
-            ))}
-          </View>
-        ) : null}
-
-        {latestResult ? (
-          <View style={styles.resultCard}>
-            <Text style={styles.stockName}>
-              {latestResult.stock_name}（{latestResult.stock_code}）
+      {/* Messages / Content Area */}
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        ref={scrollRef}
+        keyboardShouldPersistTaps="handled"
+      >
+        {!hasContent ? (
+          /* Empty State */
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>💬</Text>
+            <Text style={styles.emptyTitle}>开始问股</Text>
+            <Text style={styles.emptyDescription}>
+              输入股票代码或名称，AI 将为您分析行情走势和技术指标。
             </Text>
+            <View style={styles.quickQuestions}>
+              {QUICK_QUESTIONS.map((q) => (
+                <Pressable
+                  key={q.label}
+                  style={styles.quickQuestionButton}
+                  onPress={() => onQuickQuestion(q.question)}
+                >
+                  <Text style={styles.quickQuestionText}>{q.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <>
+            {/* Messages */}
+            {messages.map((msg, index) => {
+              const isLastAssistant =
+                msg.role === 'assistant' && index === messages.length - 1;
+              const showRetry = isLastAssistant && !!error && !isLoading;
+              return (
+                <MessageBubble
+                  key={`${msg.id}-${index}`}
+                  role={msg.role}
+                  content={msg.content}
+                  answerType={msg.answer_type}
+                  onRetry={showRetry ? onRetry : undefined}
+                />
+              );
+            })}
 
-            <MetricRow label="当前价" value={latestResult.price} style={styles.metricRow} />
-            <MetricRow
-              label="涨跌幅"
-              value={formatChangePct(latestResult.change_pct)}
-              valueColor={getChangeColor(latestResult.change_pct)}
-              style={styles.metricRow}
-            />
-            <MetricRow label="趋势" value={latestResult.trend} style={styles.metricRow} />
-            <MetricRow label="建议" value={latestResult.action} style={styles.metricRow} />
-            <MetricRow label="评分" value={latestResult.score} style={styles.metricRow} />
-
-            <Text style={styles.sectionTitle}>技术指标</Text>
-            <MetricRow label="MA5" value={latestResult.indicators.ma5} style={styles.metricRow} />
-            <MetricRow label="MA10" value={latestResult.indicators.ma10} style={styles.metricRow} />
-            <MetricRow label="MA20" value={latestResult.indicators.ma20} style={styles.metricRow} />
-            <MetricRow label="RSI(6)" value={latestResult.indicators.rsi6} style={styles.metricRow} />
-            <MetricRow label="RSI(12)" value={latestResult.indicators.rsi12} style={styles.metricRow} />
-            <MetricRow
-              label="成交量"
-              value={
-                latestResult.indicators.volume_ratio != null
-                  ? `${latestResult.indicators.volume_signal ?? '-'}（比值 ${latestResult.indicators.volume_ratio}）`
-                  : latestResult.indicators.volume_signal
-              }
-              style={styles.metricRow}
-            />
-
-            {latestResult.risks.length > 0 ? (
-              <>
-                <Text style={styles.sectionTitle}>风险提示</Text>
-                {latestResult.risks.map((risk) => (
-                  <Text key={risk} style={styles.riskText}>
-                    - {risk}
-                  </Text>
-                ))}
-              </>
+            {/* Error Inline Alert */}
+            {error && !isLoading ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorIcon}>!</Text>
+                <View style={styles.errorContent}>
+                  <Text style={styles.errorTitle}>问股失败</Text>
+                  <Text style={styles.errorMessage}>{error}</Text>
+                </View>
+              </View>
             ) : null}
 
-            <AppButton
-              title={addToWatchlistLoading ? '添加中...' : '加入自选'}
-              variant="secondary"
-              onPress={onAddToWatchlist}
-              loading={addToWatchlistLoading}
-              disabled={addToWatchlistLoading}
-              style={styles.watchlistButton}
-            />
-          </View>
-        ) : null}
-      </AppCard>
-    </ScrollView>
+            {/* Loading Indicator */}
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>分析中...</Text>
+              </View>
+            ) : null}
+
+            {/* Result Card */}
+            {latestResult ? (
+              <View style={styles.resultCard}>
+                <Text style={styles.stockName}>
+                  {latestResult.stock_name}（{latestResult.stock_code}）
+                </Text>
+
+                {/* 行情概览 */}
+                <Text style={styles.sectionTitle}>行情概览</Text>
+                <View style={styles.sectionCard}>
+                  <MetricRow label="当前价" value={latestResult.price} compact />
+                  <MetricRow
+                    label="涨跌幅"
+                    value={formatChangePct(latestResult.change_pct)}
+                    valueColor={getChangeColor(latestResult.change_pct)}
+                    compact
+                  />
+                  <MetricRow label="趋势" value={latestResult.trend} compact />
+                  <MetricRow label="建议" value={latestResult.action} compact />
+                  <MetricRow label="评分" value={latestResult.score} compact />
+                </View>
+
+                {/* 技术指标 */}
+                <Text style={styles.sectionTitle}>技术指标</Text>
+                <View style={styles.sectionCard}>
+                  <MetricRow label="MA5" value={latestResult.indicators.ma5} compact />
+                  <MetricRow label="MA10" value={latestResult.indicators.ma10} compact />
+                  <MetricRow label="MA20" value={latestResult.indicators.ma20} compact />
+                  <MetricRow label="RSI(6)" value={latestResult.indicators.rsi6} compact />
+                  <MetricRow label="RSI(12)" value={latestResult.indicators.rsi12} compact />
+                  <MetricRow
+                    label="成交量"
+                    value={
+                      latestResult.indicators.volume_ratio != null
+                        ? `${latestResult.indicators.volume_signal ?? '-'}（比值 ${latestResult.indicators.volume_ratio}）`
+                        : latestResult.indicators.volume_signal
+                    }
+                    compact
+                    multiline
+                  />
+                </View>
+
+                {/* 风险提示 */}
+                {latestResult.risks.length > 0 ? (
+                  <>
+                    <Text style={styles.sectionTitle}>风险提示</Text>
+                    <View style={styles.riskCard}>
+                      {latestResult.risks.map((risk) => (
+                        <Text key={risk} style={styles.riskText}>
+                          ⚠️ {risk}
+                        </Text>
+                      ))}
+                    </View>
+                  </>
+                ) : null}
+
+                <AppButton
+                  title={addToWatchlistLoading ? '添加中...' : '加入自选'}
+                  variant="secondary"
+                  onPress={onAddToWatchlist}
+                  loading={addToWatchlistLoading}
+                  disabled={addToWatchlistLoading}
+                  style={styles.watchlistButton}
+                />
+              </View>
+            ) : null}
+          </>
+        )}
+      </ScrollView>
+
+      {/* Input Area */}
+      <View style={styles.inputArea}>
+        <View style={styles.inputRow}>
+          <TextInput
+            ref={inputRef}
+            style={styles.input}
+            value={question}
+            onChangeText={setQuestion}
+            placeholder="例如：600519 怎么看？"
+            placeholderTextColor={colors.textSubtle}
+            multiline
+            maxLength={500}
+            editable={!isLoading}
+          />
+          <Pressable
+            style={[styles.sendButton, (!question.trim() || isLoading) && styles.sendButtonDisabled]}
+            onPress={onAsk}
+            disabled={!question.trim() || isLoading}
+          >
+            <Text style={[styles.sendButtonText, (!question.trim() || isLoading) && styles.sendButtonTextDisabled]}>
+              发送
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContainer: {
+  root: {
     flex: 1,
     backgroundColor: colors.background,
   },
-  container: {
-    alignItems: 'center',
-    padding: spacing.xxl,
-  },
-  card: {
-    maxWidth: 560,
-  },
-  headerRow: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   headerTextGroup: {
     flex: 1,
@@ -221,55 +346,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: 12,
-    paddingHorizontal: spacing.buttonHorizontal,
-    paddingVertical: spacing.buttonVertical,
-    fontSize: 16,
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
+  scrollContainer: {
+    flex: 1,
   },
-  submitButton: {
-    marginBottom: spacing.lg,
-  },
-  errorText: {
-    ...typography.helper,
-    color: colors.danger,
-    marginBottom: spacing.md,
-  },
-  messagesContainer: {
-    marginBottom: spacing.lg,
-  },
-  resultCard: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.lg,
-  },
-  stockName: {
-    ...typography.sectionTitle,
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
-  },
-  metricRow: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceMuted,
-    paddingVertical: spacing.md,
-  },
-  sectionTitle: {
-    ...typography.sectionTitle,
-    color: colors.textPrimary,
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
-  },
-  riskText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-  },
-  watchlistButton: {
-    marginTop: spacing.lg,
+  scrollContent: {
+    padding: spacing.xxl,
+    paddingBottom: spacing.sm,
   },
   centerContainer: {
     flex: 1,
@@ -277,5 +359,181 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xxl,
+  },
+
+  // Empty State
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyIcon: {
+    fontSize: 40,
+    marginBottom: spacing.lg,
+  },
+  emptyTitle: {
+    ...typography.sectionTitle,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  emptyDescription: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginBottom: spacing.xxl,
+    maxWidth: 300,
+  },
+  quickQuestions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  quickQuestionButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+  },
+  quickQuestionText: {
+    ...typography.body,
+    color: colors.primary,
+  },
+
+  // Error
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.dangerSoft,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  errorIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.danger,
+    color: colors.textInverse,
+    textAlign: 'center',
+    lineHeight: 22,
+    fontSize: 14,
+    fontWeight: '700',
+    overflow: 'hidden',
+  },
+  errorContent: {
+    flex: 1,
+  },
+  errorTitle: {
+    ...typography.label,
+    color: colors.danger,
+    marginBottom: 2,
+  },
+  errorMessage: {
+    ...typography.helper,
+    color: colors.textSecondary,
+  },
+
+  // Loading
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.textMuted,
+  },
+
+  // Result Card
+  resultCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.cardPadding,
+    marginTop: spacing.sm,
+  },
+  stockName: {
+    ...typography.sectionTitle,
+    color: colors.textPrimary,
+    marginBottom: spacing.lg,
+    fontSize: 18,
+  },
+  sectionTitle: {
+    ...typography.label,
+    color: colors.textMuted,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 10,
+    padding: spacing.md,
+  },
+  riskCard: {
+    backgroundColor: colors.dangerSoft,
+    borderRadius: 10,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  riskText: {
+    ...typography.body,
+    color: colors.danger,
+    marginBottom: spacing.xs,
+  },
+  watchlistButton: {
+    marginTop: spacing.lg,
+  },
+
+  // Input Area
+  inputArea: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.sm,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: 12,
+    paddingHorizontal: spacing.buttonHorizontal,
+    paddingVertical: spacing.buttonVertical,
+    fontSize: 16,
+    color: colors.textPrimary,
+    maxHeight: 120,
+    backgroundColor: colors.background,
+  },
+  sendButton: {
+    minHeight: 42,
+    minWidth: 60,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.buttonVertical,
+  },
+  sendButtonDisabled: {
+    backgroundColor: colors.border,
+  },
+  sendButtonText: {
+    ...typography.bodyStrong,
+    color: colors.textInverse,
+  },
+  sendButtonTextDisabled: {
+    color: colors.textSubtle,
   },
 });

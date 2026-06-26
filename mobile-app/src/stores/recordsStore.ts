@@ -6,10 +6,13 @@ interface RecordsState {
   items: RecordItem[];
   isLoading: boolean;
   loadError: string;
+  searchQuery: string;
 }
 
 interface RecordsActions {
   fetchRecords: () => Promise<void>;
+  setSearchQuery: (query: string) => void;
+  getFilteredRecords: (query: string) => RecordItem[];
   reset: () => void;
 }
 
@@ -17,9 +20,10 @@ const initialState: RecordsState = {
   items: [],
   isLoading: false,
   loadError: '',
+  searchQuery: '',
 };
 
-export const useRecordsStore = create<RecordsState & RecordsActions>((set) => ({
+export const useRecordsStore = create<RecordsState & RecordsActions>((set, get) => ({
   ...initialState,
 
   fetchRecords: async () => {
@@ -34,6 +38,23 @@ export const useRecordsStore = create<RecordsState & RecordsActions>((set) => ({
           : '加载记录失败';
       set({ loadError: message, isLoading: false });
     }
+  },
+
+  setSearchQuery: (query: string) => {
+    set({ searchQuery: query });
+  },
+
+  getFilteredRecords: (query: string) => {
+    const { items } = get();
+    if (!query.trim()) return items;
+    const lower = query.trim().toLowerCase();
+    return items.filter(
+      (item) =>
+        item.stock_code.toLowerCase().includes(lower) ||
+        item.stock_name.toLowerCase().includes(lower) ||
+        (item.title && item.title.toLowerCase().includes(lower)) ||
+        (item.summary && item.summary.toLowerCase().includes(lower)),
+    );
   },
 
   reset: () => set(initialState),
