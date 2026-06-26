@@ -90,6 +90,8 @@ d:/ai-stock-analysis/stock-analysis-reference
 - `docs/README.md` 是项目总览。
 - `docs/code-review-notes.md` 是代码问题隐患记录。
 - `docs/common-issues.md` 是常见问题与排查手册。
+- `docs/经验记录.md` 是个人经验库。
+- `docs/guide/` 是常用参考文档（结构速查、数据流、架构总览）。
 - `docs/archive/` 是历史文档归档。
 - `.trae/rules/project_rules.md` 是 AI 协作规则文件。
 
@@ -231,7 +233,9 @@ mobile-app/
 - `docs/README.md` 项目总览，包含快速启动、技术栈、版本历史。
 - `docs/code-review-notes.md` 记录代码阅读中发现的问题和隐患。
 - `docs/common-issues.md` 记录多次出现的常见问题和排查方式。
-- `docs/archive/` 历史文档归档，包含 v0.1~v0.9 的计划、总结和学习笔记。
+- `docs/经验记录.md` 记录个人开发经验和方法论。
+- `docs/guide/` 常用参考文档（项目结构、数据流、架构总览）。
+- `docs/archive/` 历史文档归档，包含已完成版本的计划、总结和学习笔记。
 - `.trae/rules/project_rules.md` 记录 AI 协作规则和项目上下文。
 
 ## 9. 复习与学习目标规划
@@ -308,8 +312,10 @@ mobile-app/
 
 1. `.trae/rules/project_rules.md` — 协作规则和项目事实
 2. `docs/overall-roadmap.md` — 总体发展方案（当前活跃）
-3. `docs/code-review-notes.md` — 待修复问题清单
-4. `docs/README.md` — 项目总览
+3. `docs/guide/` — 项目结构/数据流/架构参考文档
+4. `docs/code-review-notes.md` — 待修复问题清单
+5. `docs/经验记录.md` — 个人经验与方法论
+6. `docs/README.md` — 项目总览
 
 然后先确认用户当前想做什么，再按对应模式工作。
 
