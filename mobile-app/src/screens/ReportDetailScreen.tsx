@@ -10,6 +10,7 @@ import type { Report, RootTabParamList } from '../types';
 import { AppCard } from '../components/AppCard';
 import { LoginRequiredView } from '../components/LoginRequiredView';
 import { MetricRow } from '../components/MetricRow';
+import { ScoreGauge } from '../components/ScoreGauge';
 import { StateView } from '../components/StateView';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -80,7 +81,7 @@ export default function ReportDetailScreen() {
         </Text>
 
         <MetricRow label="当前价格" value={report.price} style={styles.metricRow} />
-        <MetricRow label="综合评分" value={`${report.score}/100`} style={styles.metricRow} />
+        <ScoreGauge score={report.score} />
         <MetricRow label="操作建议" value={report.action} style={styles.metricRow} />
         <MetricRow label="趋势判断" value={report.trend} style={styles.metricRow} />
 
@@ -179,7 +180,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: spacing.xxl,
+    padding: spacing.screenHorizontal,
   },
   centerContainer: {
     flex: 1,
@@ -189,8 +190,7 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
   },
   card: {
-    maxWidth: 560,
-    alignSelf: 'center',
+    width: '100%',
   },
   title: {
     ...typography.pageTitle,

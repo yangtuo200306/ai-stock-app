@@ -17,6 +17,7 @@ export type RootTabParamList = {
 export type WatchlistStackParamList = {
   Watchlist: undefined;
   TaskStatus: { taskId: string; stockCode: string };
+  RecordDetail: { recordId: number };
   ReportDetail: { reportId: number };
 };
 

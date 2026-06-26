@@ -5,6 +5,7 @@ import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { getRecordTypeColor, getRecordTypeLabel } from '../utils/recordDisplay';
 import { getTaskStatusColor, getTaskStatusLabel } from '../utils/taskStatusDisplay';
+import { formatChangePct, getChangeColor } from '../utils/stockDisplay';
 import type { Stock } from '../types';
 
 type WatchlistStockCardProps = {
@@ -12,6 +13,7 @@ type WatchlistStockCardProps = {
   taskStatus?: string | null;
   onPress: () => void;
   onAskAI: () => void;
+  onAnalyze: () => void;
   onDeleteRequest: () => void;
 };
 
@@ -25,19 +27,33 @@ export function WatchlistStockCard({
   taskStatus,
   onPress,
   onAskAI,
+  onAnalyze,
   onDeleteRequest,
 }: WatchlistStockCardProps) {
   const typeBarColor = getTypeBarColor(stock.latest_record_type);
+  const changeColor = stock.change_pct != null ? getChangeColor(stock.change_pct) : undefined;
 
   return (
     <Pressable onPress={onPress} style={styles.card}>
       <View style={[styles.typeBar, { backgroundColor: typeBarColor }]} />
       <View style={styles.content}>
-        {/* Top row: code + name + status badge */}
+        {/* Top row: code + name + price + change */}
         <View style={styles.topRow}>
           <View style={styles.codeNameRow}>
             <Text style={styles.stockCode}>{stock.code}</Text>
             <Text style={styles.stockName}>{stock.name}</Text>
+          </View>
+          <View style={styles.priceRow}>
+            {stock.price != null ? (
+              <Text style={styles.priceText}>
+                {stock.price.toFixed(2)}
+              </Text>
+            ) : null}
+            {stock.change_pct != null ? (
+              <Text style={[styles.changeText, changeColor ? { color: changeColor } : null]}>
+                {formatChangePct(stock.change_pct)}
+              </Text>
+            ) : null}
           </View>
           {taskStatus ? (
             <View style={[styles.statusBadge, { backgroundColor: getTaskStatusColor(taskStatus) }]}>
@@ -83,8 +99,16 @@ export function WatchlistStockCard({
               onAskAI();
             }}
           >
-            <Text style={styles.askAiIcon}>AI</Text>
             <Text style={styles.askAiLabel}>问 AI</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.actionButton, styles.analyzeButton]}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onAnalyze();
+            }}
+          >
+            <Text style={styles.analyzeLabel}>分析</Text>
           </Pressable>
           <Pressable
             style={[styles.actionButton, styles.deleteButton]}
@@ -93,7 +117,6 @@ export function WatchlistStockCard({
               onDeleteRequest();
             }}
           >
-            <Text style={styles.deleteIcon}>×</Text>
             <Text style={styles.deleteLabel}>删除</Text>
           </Pressable>
         </View>
@@ -144,6 +167,22 @@ const styles = StyleSheet.create({
   stockName: {
     ...typography.helper,
     color: colors.textSecondary,
+  },
+  priceRow: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  priceText: {
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+    color: colors.textPrimary,
+    fontFamily: 'monospace',
+  },
+  changeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 17,
   },
   statusBadge: {
     paddingHorizontal: spacing.sm,
@@ -198,23 +237,15 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 36,
+    minHeight: 34,
     borderRadius: 10,
     borderWidth: 1,
-    gap: 4,
   },
   askAiButton: {
     backgroundColor: colors.primarySoft,
     borderColor: colors.primarySoft,
-  },
-  askAiIcon: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.primary,
-    lineHeight: 16,
   },
   askAiLabel: {
     fontSize: 13,
@@ -222,15 +253,19 @@ const styles = StyleSheet.create({
     color: colors.primary,
     lineHeight: 18,
   },
+  analyzeButton: {
+    backgroundColor: colors.secondarySoft,
+    borderColor: colors.secondarySoft,
+  },
+  analyzeLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.secondary,
+    lineHeight: 18,
+  },
   deleteButton: {
     backgroundColor: colors.dangerSoft,
     borderColor: colors.dangerSoft,
-  },
-  deleteIcon: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.danger,
-    lineHeight: 20,
   },
   deleteLabel: {
     fontSize: 13,

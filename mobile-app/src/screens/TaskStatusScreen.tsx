@@ -159,8 +159,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    alignItems: 'center',
-    padding: spacing.xxl,
+    paddingHorizontal: spacing.screenHorizontal,
   },
   centerContainer: {
     flex: 1,
@@ -170,7 +169,7 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
   },
   card: {
-    maxWidth: 420,
+    width: '100%',
     marginTop: spacing.xxl,
   },
   title: {

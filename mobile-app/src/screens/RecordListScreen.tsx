@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../contexts/AuthContext';
 import { useRecordsStore } from '../stores/recordsStore';
-import type { RecordStackParamList, RootTabParamList } from '../types';
+import type { RecordItem, RecordStackParamList, RootTabParamList } from '../types';
 import { LoginRequiredView } from '../components/LoginRequiredView';
 import { RecordCard } from '../components/RecordCard';
 import { StateView } from '../components/StateView';
@@ -26,6 +27,7 @@ export default function RecordListScreen() {
     loadError,
     searchQuery,
     fetchRecords,
+    deleteRecord,
     setSearchQuery,
     getFilteredRecords,
   } = useRecordsStore();
@@ -41,6 +43,26 @@ export default function RecordListScreen() {
     await fetchRecords();
     setRefreshing(false);
   }, [fetchRecords]);
+
+  const handleDelete = useCallback(
+    (item: RecordItem) => {
+      Alert.alert(
+        '确认删除',
+        `确定删除 ${item.stock_name}（${item.stock_code}）的记录？`,
+        [
+          { text: '取消', style: 'cancel' },
+          {
+            text: '删除',
+            style: 'destructive',
+            onPress: async () => {
+              await deleteRecord(item.id);
+            },
+          },
+        ],
+      );
+    },
+    [deleteRecord],
+  );
 
   const filteredItems = useMemo(
     () => getFilteredRecords(searchQuery),
@@ -79,7 +101,7 @@ export default function RecordListScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Title row */}
       <View style={styles.headerRow}>
         <View style={styles.titleLeft}>
@@ -116,6 +138,7 @@ export default function RecordListScreen() {
           <RecordCard
             item={item}
             onPress={() => navigation.navigate('RecordDetail', { recordId: item.id })}
+            onDelete={() => handleDelete(item)}
           />
         )}
         refreshing={refreshing}
@@ -138,7 +161,7 @@ export default function RecordListScreen() {
           )
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

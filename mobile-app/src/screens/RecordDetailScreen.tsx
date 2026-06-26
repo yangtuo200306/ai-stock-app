@@ -12,6 +12,7 @@ import { AppCard } from '../components/AppCard';
 import { LoginRequiredView } from '../components/LoginRequiredView';
 import { MessageBubble } from '../components/MessageBubble';
 import { MetricRow } from '../components/MetricRow';
+import { ScoreGauge } from '../components/ScoreGauge';
 import { StateView } from '../components/StateView';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -160,7 +161,7 @@ export default function RecordDetailScreen() {
             )}
 
             {record.metadata.score != null && (
-              <MetricRow label="评分" value={record.metadata.score} style={styles.metricRow} />
+              <ScoreGauge score={record.metadata.score} />
             )}
 
             {record.metadata.action != null && (
@@ -213,7 +214,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: spacing.xxl,
+    padding: spacing.screenHorizontal,
   },
   centerContainer: {
     flex: 1,
@@ -223,8 +224,7 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
   },
   card: {
-    maxWidth: 560,
-    alignSelf: 'center',
+    width: '100%',
   },
   typeBarRow: {
     flexDirection: 'row',

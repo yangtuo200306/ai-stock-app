@@ -130,3 +130,4 @@ export function resetAllStores() {
 - [总体发展方案](overall-roadmap.md)
 - [项目协作规则](../.trae/rules/project_rules.md)
 - [代码问题与隐患记录](code-review-notes.md)
+- [v1.6 总结](archive/releases/v1.6-summary.md)

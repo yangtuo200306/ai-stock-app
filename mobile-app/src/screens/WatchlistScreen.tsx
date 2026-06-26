@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -16,6 +10,7 @@ import type { Stock, WatchlistStackParamList, RootTabParamList } from '../types'
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { LoginRequiredView } from '../components/LoginRequiredView';
 import { StateView } from '../components/StateView';
+import { StockAutocomplete } from '../components/StockAutocomplete';
 import { WatchlistStockCard } from '../components/WatchlistStockCard';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -50,6 +45,7 @@ export default function WatchlistScreen() {
   const [deleteTarget, setDeleteTarget] = useState<Stock | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [codeValid, setCodeValid] = useState<'valid' | 'invalid' | null>(null);
+  const [selectedStock, setSelectedStock] = useState<{ code: string; name: string } | null>(null);
 
   useEffect(() => {
     if (authLoading || !isLoggedIn) return;
@@ -111,6 +107,17 @@ export default function WatchlistScreen() {
     [navigation, createAnalysis],
   );
 
+  const handleCardPress = useCallback(
+    (stock: Stock) => {
+      if (stock.latest_record_id != null) {
+        navigation.navigate('RecordDetail', { recordId: stock.latest_record_id });
+      } else {
+        Alert.alert('提示', '暂无分析记录');
+      }
+    },
+    [navigation],
+  );
+
   const handleAskAI = useCallback(
     (stock: Stock) => {
       tabNavigation.navigate('问股', { initialQuestion: `${stock.code} 怎么看？` });
@@ -151,15 +158,16 @@ export default function WatchlistScreen() {
       <WatchlistStockCard
         stock={item}
         taskStatus={status}
-        onPress={() => handleCreateAnalysis(item)}
+        onPress={() => handleCardPress(item)}
         onAskAI={() => handleAskAI(item)}
+        onAnalyze={() => handleCreateAnalysis(item)}
         onDeleteRequest={() => setDeleteTarget(item)}
       />
     );
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Title row */}
       <View style={styles.headerRow}>
         <View style={styles.titleLeft}>
@@ -198,13 +206,25 @@ export default function WatchlistScreen() {
       {showForm ? (
         <View style={styles.formCard}>
           <View style={styles.formRow}>
-            <View style={styles.codeInputWrapper}>
+              <View style={[styles.codeInputWrapper, codeValid === 'valid' && styles.inputValid, codeValid === 'invalid' && styles.inputInvalid]}>
+              <StockAutocomplete
+                query={newCode}
+                selected={selectedStock}
+                onSelect={(code, name) => {
+                  setSelectedStock({ code, name });
+                  setNewCode(code);
+                  setNewName(name);
+                  setCodeValid('valid');
+                }}
+                onRemove={() => {
+                  setSelectedStock(null);
+                  setNewCode('');
+                  setNewName('');
+                  setCodeValid(null);
+                }}
+              />
               <TextInput
-                style={[
-                  styles.formInput,
-                  codeValid === 'valid' && styles.inputValid,
-                  codeValid === 'invalid' && styles.inputInvalid,
-                ]}
+                style={styles.formInput}
                 value={newCode}
                 onChangeText={handleCodeChange}
                 placeholder="股票代码"
@@ -217,7 +237,8 @@ export default function WatchlistScreen() {
               ) : codeValid === 'invalid' && newCode.trim().length > 0 ? (
                 <Text style={styles.codeFeedbackInvalid}>✗</Text>
               ) : null}
-            </View>
+              </View>
+            <View style={styles.formInputWrapper}>
             <TextInput
               style={styles.formInput}
               value={newName}
@@ -225,6 +246,7 @@ export default function WatchlistScreen() {
               placeholder="股票名称"
               placeholderTextColor={colors.textSubtle}
             />
+            </View>
           </View>
           <Pressable
             style={[
@@ -304,7 +326,7 @@ export default function WatchlistScreen() {
         }}
         onCancel={() => setDeleteTarget(null)}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -312,7 +334,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: spacing.screenHorizontal,
+    paddingHorizontal: spacing.screenHorizontal,
   },
   centerContainer: {
     flex: 1,
@@ -404,17 +426,34 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   codeInputWrapper: {
-    position: 'relative',
-  },
-  formInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
     borderWidth: 1,
     borderColor: colors.borderStrong,
     borderRadius: 12,
     paddingHorizontal: spacing.buttonHorizontal,
-    paddingVertical: spacing.buttonVertical,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.background,
+    position: 'relative',
+    zIndex: 10,
+  },
+  formInputWrapper: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: 12,
+    paddingHorizontal: spacing.buttonHorizontal,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.background,
+  },
+  formInput: {
+    flex: 1,
+    minWidth: 80,
+    borderWidth: 0,
+    paddingVertical: spacing.buttonVertical - spacing.xs,
     fontSize: 15,
     color: colors.textPrimary,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
   },
   inputValid: {
     borderColor: colors.success,
@@ -423,26 +462,14 @@ const styles = StyleSheet.create({
     borderColor: colors.danger,
   },
   codeFeedbackValid: {
-    position: 'absolute',
-    right: spacing.md,
-    top: 0,
-    bottom: 0,
-    textAlignVertical: 'center',
     fontSize: 16,
     color: colors.success,
     fontWeight: '700',
-    lineHeight: 42,
   },
   codeFeedbackInvalid: {
-    position: 'absolute',
-    right: spacing.md,
-    top: 0,
-    bottom: 0,
-    textAlignVertical: 'center',
     fontSize: 16,
     color: colors.danger,
     fontWeight: '700',
-    lineHeight: 42,
   },
   addConfirmButton: {
     minHeight: 42,

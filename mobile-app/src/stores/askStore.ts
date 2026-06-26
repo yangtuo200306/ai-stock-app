@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { apiPost } from '../api/client';
 import type { AskMessage, AskResponse } from '../types';
 import { useWatchlistStore } from './watchlistStore';
+import { useRecordsStore } from './recordsStore';
 
 interface AskState {
   sessionId: string | null;
@@ -14,7 +15,7 @@ interface AskState {
 
 interface AskActions {
   setQuestion: (text: string) => void;
-  handleAsk: () => Promise<void>;
+  handleAsk: (stockCode?: string) => Promise<void>;
   handleNewSession: () => void;
   handleAddToWatchlist: () => Promise<boolean>;
   restoreSession: (sessionId: string, messages: AskMessage[]) => void;
@@ -35,7 +36,7 @@ export const useAskStore = create<AskState & AskActions>((set, get) => ({
 
   setQuestion: (text: string) => set({ question: text }),
 
-  handleAsk: async () => {
+  handleAsk: async (stockCode?: string) => {
     const { question, sessionId, messages } = get();
     if (!question.trim()) {
       set({ error: '请先输入股票问题' });
@@ -48,6 +49,9 @@ export const useAskStore = create<AskState & AskActions>((set, get) => ({
       const body: Record<string, unknown> = { question: question.trim() };
       if (sessionId) {
         body.session_id = sessionId;
+      }
+      if (stockCode) {
+        body.stock_code = stockCode;
       }
 
       const data = await apiPost('/api/ask', body);
@@ -81,6 +85,10 @@ export const useAskStore = create<AskState & AskActions>((set, get) => ({
           question: '',
           isLoading: false,
         });
+
+        // 刷新自选列表摘要和记录列表
+        useWatchlistStore.getState().loadStocks();
+        useRecordsStore.getState().fetchRecords();
       } else {
         set({
           error: data.message || data.detail || '问股失败，请稍后重试',

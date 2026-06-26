@@ -76,8 +76,9 @@ def ask_stock(ask: AskCreate, user_id: str = Depends(get_current_user_id)):
         stock_code = session["stock_code"]
         requested_stock_code = _extract_stock_code(ask.question or "")
         if requested_stock_code and requested_stock_code != stock_code:
-            raise api_error(400, ErrorCode.SESSION_STOCK_MISMATCH,
-                             f"当前会话围绕 {session['stock_name']}（{stock_code}），如需分析其他股票请新开问题")
+            # 用户问了其他股票，允许但提示切换
+            stock_code = requested_stock_code
+            session = None  # 重新获取新股票的数据
     elif ask.stock_code:
         stock_code = ask.stock_code.strip()
     elif ask.question:

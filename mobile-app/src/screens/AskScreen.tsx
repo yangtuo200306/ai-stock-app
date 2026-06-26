@@ -1,15 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -20,7 +11,9 @@ import { AppButton } from '../components/AppButton';
 import { LoginRequiredView } from '../components/LoginRequiredView';
 import { MessageBubble } from '../components/MessageBubble';
 import { MetricRow } from '../components/MetricRow';
+import { ScoreGauge } from '../components/ScoreGauge';
 import { StateView } from '../components/StateView';
+import { StockAutocomplete } from '../components/StockAutocomplete';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -45,6 +38,7 @@ export default function AskScreen() {
     setQuestion, handleAsk, handleNewSession, handleAddToWatchlist, restoreSession,
   } = useAskStore();
   const [addToWatchlistLoading, setAddToWatchlistLoading] = useState(false);
+  const [selectedStock, setSelectedStock] = useState<{ code: string; name: string } | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
   const initialParamsHandled = useRef(false);
@@ -81,25 +75,23 @@ export default function AskScreen() {
   }, [handleNewSession]);
 
   const onAsk = useCallback(() => {
-    handleAsk().then(() => {
+    handleAsk(selectedStock?.code).then(() => {
+      setSelectedStock(null);
       scrollToEnd();
     });
-  }, [handleAsk, scrollToEnd]);
+  }, [handleAsk, selectedStock, scrollToEnd]);
 
   const onQuickQuestion = useCallback((q: string) => {
     setQuestion(q);
-    setTimeout(() => {
-      handleAsk().then(() => {
-        scrollToEnd();
-      });
-    }, 50);
-  }, [setQuestion, handleAsk, scrollToEnd]);
+    setSelectedStock(null);
+    inputRef.current?.focus();
+  }, [setQuestion]);
 
   const onRetry = useCallback(() => {
-    handleAsk().then(() => {
+    handleAsk(selectedStock?.code).then(() => {
       scrollToEnd();
     });
-  }, [handleAsk, scrollToEnd]);
+  }, [handleAsk, selectedStock, scrollToEnd]);
 
   const onAddToWatchlist = useCallback(async () => {
     setAddToWatchlistLoading(true);
@@ -130,34 +122,35 @@ export default function AskScreen() {
   const hasContent = messages.length > 0 || latestResult;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTextGroup}>
-          <Text style={styles.title}>问股</Text>
-          <Text style={styles.description}>输入股票问题，查看 AI 分析</Text>
-        </View>
-        {(sessionId || messages.length > 0) && (
-          <AppButton
-            title="新建会话"
-            variant="ghost"
-            onPress={onNewSession}
-            style={styles.newSessionButton}
-          />
-        )}
-      </View>
-
-      {/* Messages / Content Area */}
-      <ScrollView
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-        ref={scrollRef}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.root}>
+      <KeyboardAvoidingView
+        style={styles.root}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 56}
       >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerTextGroup}>
+            <Text style={styles.title}>问股</Text>
+            <Text style={styles.description}>输入股票问题，查看 AI 分析</Text>
+          </View>
+          {(sessionId || messages.length > 0) && (
+            <AppButton
+              title="新建会话"
+              variant="ghost"
+              onPress={onNewSession}
+              style={styles.newSessionButton}
+            />
+          )}
+        </View>
+
+        {/* Messages / Content Area */}
+        <ScrollView
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
+        >
         {!hasContent ? (
           /* Empty State */
           <View style={styles.emptyState}>
@@ -233,7 +226,7 @@ export default function AskScreen() {
                   />
                   <MetricRow label="趋势" value={latestResult.trend} compact />
                   <MetricRow label="建议" value={latestResult.action} compact />
-                  <MetricRow label="评分" value={latestResult.score} compact />
+                  <ScoreGauge score={latestResult.score} />
                 </View>
 
                 {/* 技术指标 */}
@@ -287,17 +280,28 @@ export default function AskScreen() {
       {/* Input Area */}
       <View style={styles.inputArea}>
         <View style={styles.inputRow}>
-          <TextInput
-            ref={inputRef}
-            style={styles.input}
-            value={question}
-            onChangeText={setQuestion}
-            placeholder="例如：600519 怎么看？"
-            placeholderTextColor={colors.textSubtle}
-            multiline
-            maxLength={500}
-            editable={!isLoading}
-          />
+          <View style={styles.inputWrapper}>
+            <StockAutocomplete
+              query={question}
+              selected={selectedStock}
+              onSelect={(code, name) => {
+                setSelectedStock({ code, name });
+                setQuestion(`${code} `);
+              }}
+              onRemove={() => setSelectedStock(null)}
+            />
+            <TextInput
+              ref={inputRef}
+              style={styles.input}
+              value={question}
+              onChangeText={setQuestion}
+              placeholder="例如：600519 怎么看？"
+              placeholderTextColor={colors.textSubtle}
+              multiline
+              maxLength={500}
+              editable={!isLoading}
+            />
+          </View>
           <Pressable
             style={[styles.sendButton, (!question.trim() || isLoading) && styles.sendButtonDisabled]}
             onPress={onAsk}
@@ -309,7 +313,8 @@ export default function AskScreen() {
           </Pressable>
         </View>
       </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -321,13 +326,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    alignItems: 'center',
+    paddingHorizontal: spacing.screenHorizontal,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
   },
   headerTextGroup: {
     flex: 1,
@@ -350,7 +352,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.xxl,
+    padding: spacing.screenHorizontal,
     paddingBottom: spacing.sm,
   },
   centerContainer: {
@@ -496,25 +498,37 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: spacing.screenHorizontal,
     paddingVertical: spacing.sm,
+    zIndex: 10,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: spacing.sm,
   },
-  input: {
+  inputWrapper: {
     flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.borderStrong,
     borderRadius: 12,
     paddingHorizontal: spacing.buttonHorizontal,
-    paddingVertical: spacing.buttonVertical,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.background,
+    position: 'relative',
+    zIndex: 10,
+  },
+  input: {
+    flex: 1,
+    minWidth: 80,
+    borderWidth: 0,
+    paddingVertical: spacing.buttonVertical - spacing.xs,
     fontSize: 16,
     color: colors.textPrimary,
     maxHeight: 120,
-    backgroundColor: colors.background,
   },
   sendButton: {
     minHeight: 42,

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { apiGet } from '../api/client';
+import { apiDelete, apiGet } from '../api/client';
 import type { RecordItem } from '../types';
 
 interface RecordsState {
@@ -11,6 +11,7 @@ interface RecordsState {
 
 interface RecordsActions {
   fetchRecords: () => Promise<void>;
+  deleteRecord: (id: number) => Promise<boolean>;
   setSearchQuery: (query: string) => void;
   getFilteredRecords: (query: string) => RecordItem[];
   reset: () => void;
@@ -37,6 +38,19 @@ export const useRecordsStore = create<RecordsState & RecordsActions>((set, get) 
           ? (err as { message: string }).message
           : '加载记录失败';
       set({ loadError: message, isLoading: false });
+    }
+  },
+
+  deleteRecord: async (id: number) => {
+    try {
+      const data = await apiDelete(`/api/records/${id}`);
+      if (data.message === 'record deleted') {
+        await get().fetchRecords();
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
   },
 

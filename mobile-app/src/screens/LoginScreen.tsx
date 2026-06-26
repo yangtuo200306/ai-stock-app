@@ -15,6 +15,8 @@ export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -57,38 +59,56 @@ export default function LoginScreen() {
       <AppCard style={styles.card}>
         <Text style={styles.title}>{mode === 'login' ? '登录' : '注册'}</Text>
 
-        <TextInput
-          style={styles.input}
-          value={username}
-          onChangeText={setUsername}
-          placeholder="用户名"
-          placeholderTextColor={colors.textSubtle}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            value={username}
+            onChangeText={setUsername}
+            placeholder="用户名"
+            placeholderTextColor={colors.textSubtle}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
 
         <View style={styles.inputDivider} />
 
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="密码"
-          placeholderTextColor={colors.textSubtle}
-          secureTextEntry
-        />
+        <View style={styles.passwordRow}>
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            placeholder="密码"
+            placeholderTextColor={colors.textSubtle}
+            secureTextEntry={!showPassword}
+          />
+          <Pressable
+            style={styles.eyeButton}
+            onPress={() => setShowPassword((v) => !v)}
+          >
+            <Text style={styles.eyeIcon}>{showPassword ? '👁' : '👁‍🗨'}</Text>
+          </Pressable>
+        </View>
 
         {mode === 'register' && (
           <>
             <View style={styles.inputDivider} />
-            <TextInput
-              style={styles.input}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="确认密码"
-              placeholderTextColor={colors.textSubtle}
-              secureTextEntry
-            />
+            <View style={styles.passwordRow}>
+              <TextInput
+                style={styles.input}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="确认密码"
+                placeholderTextColor={colors.textSubtle}
+                secureTextEntry={!showConfirmPassword}
+              />
+              <Pressable
+                style={styles.eyeButton}
+                onPress={() => setShowConfirmPassword((v) => !v)}
+              >
+                <Text style={styles.eyeIcon}>{showConfirmPassword ? '👁' : '👁‍🗨'}</Text>
+              </Pressable>
+            </View>
           </>
         )}
 
@@ -126,12 +146,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    alignItems: 'center',
+    padding: spacing.lg,
     justifyContent: 'center',
-    padding: spacing.xxl,
   },
   card: {
-    maxWidth: 420,
+    width: '100%',
   },
   title: {
     ...typography.pageTitle,
@@ -139,14 +158,36 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xxl,
     textAlign: 'center',
   },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   input: {
+    flex: 1,
     borderWidth: 1,
     borderColor: colors.borderStrong,
     borderRadius: 12,
     paddingHorizontal: spacing.buttonHorizontal,
-    paddingVertical: spacing.buttonVertical,
+    paddingVertical: 14,
     fontSize: 16,
     color: colors.textPrimary,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: spacing.sm,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  eyeIcon: {
+    fontSize: 18,
   },
   inputDivider: {
     height: spacing.md,

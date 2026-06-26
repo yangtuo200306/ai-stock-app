@@ -1,6 +1,8 @@
 export interface Stock {
   code: string;
   name: string;
+  price?: number | null;
+  change_pct?: number | null;
   latest_record_id?: number | null;
   latest_record_type?: string | null;
   latest_summary?: string | null;

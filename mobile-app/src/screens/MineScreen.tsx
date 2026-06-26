@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
@@ -77,7 +78,8 @@ export default function MineScreen() {
   const avatarLetter = (username || '?').charAt(0).toUpperCase();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* User avatar section */}
       <View style={styles.avatarSection}>
         <View style={styles.avatarCircle}>
@@ -148,6 +150,7 @@ export default function MineScreen() {
         ) : null}
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -157,7 +160,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: spacing.xxl,
+    padding: spacing.screenHorizontal,
     gap: spacing.sectionGap,
   },
 

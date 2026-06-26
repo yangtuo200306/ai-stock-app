@@ -8,21 +8,20 @@ const Stack = createNativeStackNavigator<RecordStackParamList>();
 
 export default function RecordStackNavigator() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen
         name="RecordList"
         component={RecordListScreen}
-        options={{ title: '记录' }}
       />
       <Stack.Screen
         name="RecordDetail"
         component={RecordDetailScreen}
-        options={{ title: '记录详情' }}
+        options={{ headerShown: true, title: '记录详情' }}
       />
       <Stack.Screen
         name="ReportDetail"
         component={ReportDetailScreen}
-        options={{ title: '分析报告' }}
+        options={{ headerShown: true, title: '分析报告' }}
       />
     </Stack.Navigator>
   );

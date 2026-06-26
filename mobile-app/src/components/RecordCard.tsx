@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -10,13 +10,14 @@ import type { RecordItem } from '../types';
 type RecordCardProps = {
   item: RecordItem;
   onPress: () => void;
+  onDelete?: () => void;
 };
 
 function getTypeBarColor(recordType: string): string {
   return getRecordTypeColor(recordType);
 }
 
-export function RecordCard({ item, onPress }: RecordCardProps) {
+export function RecordCard({ item, onPress, onDelete }: RecordCardProps) {
   const typeBarColor = getTypeBarColor(item.record_type);
   const changeColor =
     item.metadata.change_pct != null ? getChangeColor(item.metadata.change_pct) : undefined;
@@ -59,7 +60,9 @@ export function RecordCard({ item, onPress }: RecordCardProps) {
         {/* Bottom meta row */}
         <View style={styles.metaRow}>
           {item.metadata.score != null ? (
-            <Text style={styles.metaScore}>评分 {item.metadata.score}</Text>
+            <Text style={[styles.metaScore, { color: item.metadata.score >= 70 ? colors.changeUp : item.metadata.score >= 40 ? '#faad14' : colors.changeDown }]}>
+              {item.metadata.score} 分
+            </Text>
           ) : null}
           {item.metadata.score != null && item.metadata.change_pct != null ? (
             <Text style={styles.metaDot}>·</Text>
@@ -68,6 +71,19 @@ export function RecordCard({ item, onPress }: RecordCardProps) {
             <Text style={[styles.metaChange, changeColor ? { color: changeColor } : null]}>
               {formatChangePct(item.metadata.change_pct)}
             </Text>
+          ) : null}
+          <View style={styles.metaSpacer} />
+          {onDelete ? (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onDelete();
+              }}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.deleteIcon}>删除</Text>
+            </TouchableOpacity>
           ) : null}
         </View>
       </View>
@@ -163,9 +179,24 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: colors.textSubtle,
   },
+  metaSpacer: {
+    flex: 1,
+  },
   metaChange: {
     fontSize: 12,
     fontWeight: '600',
+    lineHeight: 17,
+  },
+  deleteButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: colors.dangerSoft,
+  },
+  deleteIcon: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.danger,
     lineHeight: 17,
   },
 });

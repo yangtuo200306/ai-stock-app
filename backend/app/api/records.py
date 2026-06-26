@@ -103,3 +103,19 @@ def get_record(record_id: int, user_id: str = Depends(get_current_user_id)):
         result["messages"] = [dict(m) for m in msg_rows]
 
     return result
+
+
+@router.delete("/records/{record_id}")
+def delete_record(record_id: int, user_id: str = Depends(get_current_user_id)):
+    logger.info("删除记录: id=%s, user=%s", record_id, user_id)
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "DELETE FROM records WHERE id = ? AND user_id = ?",
+            (record_id, user_id),
+        )
+
+    if cursor.rowcount == 0:
+        raise api_error(404, ErrorCode.RECORD_NOT_FOUND, "记录不存在")
+
+    logger.info("记录已删除: id=%s, user=%s", record_id, user_id)
+    return {"message": "record deleted", "id": record_id}

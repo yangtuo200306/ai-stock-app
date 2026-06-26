@@ -121,6 +121,15 @@ def _to_sina_symbol(stock_code: str) -> str:
     )
 
 
+def _clean_stock_name(name: str) -> str:
+    """去除股票名称中的特殊前缀（XD除息、XR除权、DR除权除息、ST等）"""
+    prefixes = ("XD", "XR", "DR", "ST", "*ST", "N", "C", "U")
+    for prefix in prefixes:
+        if name.startswith(prefix) and len(name) > len(prefix):
+            return name[len(prefix):]
+    return name
+
+
 def _get_stock_quote_from_efinance(
     stock_code: str, fetched_at: datetime
 ) -> StockQuote:
@@ -146,7 +155,7 @@ def _get_stock_quote_from_efinance(
 
     return StockQuote(
         code=stock_code,
-        name=str(item["股票名称"]),
+        name=_clean_stock_name(str(item["股票名称"])),
         price=_to_float(item["最新价"]),
         change_pct=_to_float(item["涨跌幅"]),
         source=PRIMARY_MARKET_SOURCE,
@@ -187,7 +196,7 @@ def _get_stock_quote_from_fallback(
             f"备用行情源 {FALLBACK_MARKET_SOURCE} 返回字段不足"
         )
 
-    name = fields[0].strip()
+    name = _clean_stock_name(fields[0].strip())
     if not name:
         raise StockQuoteNotFoundError(
             f"备用行情源 {FALLBACK_MARKET_SOURCE} 未找到该股票行情"
