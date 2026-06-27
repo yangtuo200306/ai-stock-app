@@ -125,9 +125,61 @@ export function resetAllStores() {
 
 ---
 
+---
+
+## 2026-06-26：v1.7 工程化与部署实战
+
+### 1. 依赖管理策略
+
+| 场景 | 做法 | 原因 |
+|------|------|------|
+| 个人项目（本地/服务器环境不同） | `>=` 最低版本 | 不同 Python 版本都能装 |
+| 企业生产（环境一致） | `==` 锁定 + lock 文件 | 精确复现，无意外升级 |
+
+**教训**：本地 Python 3.11 锁定的版本（`fastapi==0.135.1`），在服务器 Python 3.9 上装不了。改用 `>=` 后 pip 自动选兼容版本。
+
+### 2. Python 版本兼容
+
+服务器 Ubuntu 20.04 只有 Python 3.9，遇到以下兼容问题：
+
+| 问题 | 解决方案 |
+|------|---------|
+| `str \| None` 语法（Python 3.10+） | 安装 `eval-type-backport` |
+| fastapi 0.130+ 需要 3.10+ | pip 自动选 0.128.8 |
+| uvicorn 0.40+ 需要 3.10+ | pip 自动选 0.39.0 |
+| pandas 2.x 无 3.9 预编译包 | 装 `pandas<2.0`（有 whl） |
+| numpy 2.x 不兼容 pandas 1.x | 装 `numpy<2` |
+
+### 3. systemd 服务管理
+
+```ini
+[Service]
+WorkingDirectory=/opt/ai-stock-app/backend
+ExecStart=/opt/ai-stock-app/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+```
+
+- `Restart=always`：崩溃后 5 秒自动重启
+- 日志查看：`journalctl -u ai-stock-app.service -f`
+- 端口冲突：先 `systemctl stop` 再 `start`
+
+### 4. 部署流程
+
+```
+代码提交 → git pull → pip install → 配 .env → systemctl restart
+```
+
+- 仓库设为公开，HTTPS 克隆无需认证
+- 虚拟环境隔离系统 Python
+- 阿里云安全组开放 8000 端口
+
+---
+
 ## 相关文档
 
 - [总体发展方案](overall-roadmap.md)
 - [项目协作规则](../.trae/rules/project_rules.md)
 - [代码问题与隐患记录](code-review-notes.md)
 - [v1.6 总结](archive/releases/v1.6-summary.md)
+- [v1.7 总结](archive/releases/v1.7-summary.md)

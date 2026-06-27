@@ -325,8 +325,8 @@ records (N) ──── (1) reports            (记录关联报告，通过 rep
 | 导航 | @react-navigation | - | Tab + Stack 导航 |
 | 状态管理 | Zustand | ^5.0.14 | 全局状态管理 |
 | 本地存储 | @react-native-async-storage | - | Token、配置持久化 |
-| 后端框架 | FastAPI | - | RESTful API |
-| 后端语言 | Python | - | - |
+| 后端框架 | FastAPI | >=0.109.0 | RESTful API |
+| 后端语言 | Python | 3.9（服务器）/ 3.11（本地） | - |
 | 数据库 | SQLite | - | 嵌入式数据库 |
 | 行情数据 | efinance + 新浪备用 | - | A 股实时行情 + 历史 K 线 |
 | AI 模型 | 火山方舟 (DeepSeek) | - | AI 问股回答 |
