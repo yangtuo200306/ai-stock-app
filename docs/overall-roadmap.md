@@ -235,5 +235,6 @@ backend/app/
 | `docs/archive/plans/v1.6-plan.md` | v1.6 UX 优化计划（已完成） |
 | `docs/archive/releases/v1.7-summary.md` | v1.7 工程化与部署总结（已完成） |
 | `docs/v1.8-plan.md` | v1.8 股票数据体系优化计划（待执行） |
+| `docs/archive/learning-notes-v1.0-v1.7.md` | v1.0~v1.7 学习笔记（已归档） |
 | `docs/code-review-notes.md` | 代码问题与隐患记录 |
 | `docs/README.md` | 项目总览 |
