@@ -63,8 +63,10 @@ class StockQuote:
     name: str
     price: float
     change_pct: float
-    source: str
-    fetched_at: str
+    turnover_rate: float | None = None
+    amplitude: float | None = None
+    source: str = ""
+    fetched_at: str = ""
 
     def to_dict(self):
         return asdict(self)
@@ -111,6 +113,19 @@ def _to_float(value) -> float:
         raise MarketFieldFormatError("行情字段格式异常") from error
 
 
+def _safe_float(value) -> float | None:
+    """安全的浮点数转换，失败时返回 None 而非抛异常。"""
+    if value is None:
+        return None
+    try:
+        text = str(value).replace("%", "").replace(",", "").strip()
+        if text in {"", "-", "--", "None", "nan"}:
+            return None
+        return float(text)
+    except (ValueError, TypeError):
+        return None
+
+
 def _to_sina_symbol(stock_code: str) -> str:
     if stock_code.startswith("6"):
         return f"sh{stock_code}"
@@ -153,11 +168,30 @@ def _get_stock_quote_from_efinance(
 
     item = row.iloc[0]
 
+    # 兼容 efinance 不同版本的列名
+    turnover_col = "换手率" if "换手率" in quotes.columns else ("turnover_rate" if "turnover_rate" in quotes.columns else None)
+
+    # 振幅：优先直接取，没有则用 (最高-最低)/昨收×100 计算
+    if "振幅" in quotes.columns:
+        amplitude = _safe_float(item["振幅"])
+    elif "amplitude" in quotes.columns:
+        amplitude = _safe_float(item["amplitude"])
+    else:
+        high = _safe_float(item.get("最高"))
+        low = _safe_float(item.get("最低"))
+        yesterday_close = _safe_float(item.get("昨日收盘"))
+        if high is not None and low is not None and yesterday_close is not None and yesterday_close > 0:
+            amplitude = round((high - low) / yesterday_close * 100, 2)
+        else:
+            amplitude = None
+
     return StockQuote(
         code=stock_code,
         name=_clean_stock_name(str(item["股票名称"])),
         price=_to_float(item["最新价"]),
         change_pct=_to_float(item["涨跌幅"]),
+        turnover_rate=_safe_float(item[turnover_col]) if turnover_col else None,
+        amplitude=amplitude,
         source=PRIMARY_MARKET_SOURCE,
         fetched_at=fetched_at.isoformat(timespec="seconds"),
     )
@@ -205,6 +239,8 @@ def _get_stock_quote_from_fallback(
     try:
         yesterday_close = _to_float(fields[2])
         current_price = _to_float(fields[3])
+        high_price = _to_float(fields[4])
+        low_price = _to_float(fields[5])
     except (MarketFieldEmptyError, MarketFieldFormatError) as error:
         raise MarketFieldFormatError(
             f"备用行情源 {FALLBACK_MARKET_SOURCE} 价格字段异常"
@@ -216,12 +252,15 @@ def _get_stock_quote_from_fallback(
         )
 
     change_pct = round((current_price - yesterday_close) / yesterday_close * 100, 2)
+    amplitude = round((high_price - low_price) / yesterday_close * 100, 2)
 
     return StockQuote(
         code=stock_code,
         name=name,
         price=current_price,
         change_pct=change_pct,
+        turnover_rate=None,
+        amplitude=amplitude,
         source=FALLBACK_MARKET_SOURCE,
         fetched_at=fetched_at.isoformat(timespec="seconds"),
     )

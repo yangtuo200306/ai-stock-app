@@ -27,6 +27,7 @@ def _write_analysis_record(report: dict, task_id: str, user_id: str):
         "score": report["score"],
         "action": report["action"],
         "trend": report["trend"],
+        "indicators": report["indicators"],
         "task_id": task_id,
     }
 
@@ -92,7 +93,7 @@ def create_analysis_task(analysis: AnalysisCreate, user_id: str = Depends(get_cu
 
         raise api_error(400, ErrorCode.MARKET_DATA_ERROR, failed_message)
 
-    technicals = build_technical_indicators(quote.price, history)
+    technicals = build_technical_indicators(quote, history)
     report = build_analysis_report(quote, technicals)
 
     with get_connection() as connection:

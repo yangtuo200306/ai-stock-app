@@ -8,7 +8,9 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from app.database import get_current_user_id, get_connection
-from app.services.market_data import get_stock_quote, MarketDataError
+from app.services.market_data import get_stock_history, get_stock_quote, MarketDataError
+from app.services.report_builder import build_analysis_report
+from app.services.technical_indicators import build_technical_indicators
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +53,19 @@ def get_stocks(user_id: str = Depends(get_current_user_id)):
         code = row["code"]
         price = None
         change_pct = None
+        score = None
+        trend = None
+        action = None
         try:
             quote = get_stock_quote(code)
             price = quote.price
             change_pct = quote.change_pct
+            history = get_stock_history(code)
+            technicals = build_technical_indicators(quote, history)
+            report = build_analysis_report(quote, technicals)
+            score = report["score"]
+            trend = report["trend"]
+            action = report["action"]
         except MarketDataError:
             pass
 
@@ -63,6 +74,9 @@ def get_stocks(user_id: str = Depends(get_current_user_id)):
             "name": row["name"],
             "price": price,
             "change_pct": change_pct,
+            "score": score,
+            "trend": trend,
+            "action": action,
             "latest_record_id": row["latest_record_id"],
             "latest_record_type": row["latest_record_type"],
             "latest_summary": row["latest_summary"],

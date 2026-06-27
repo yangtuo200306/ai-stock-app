@@ -44,3 +44,18 @@ export function formatChangePct(changePct?: number | null) {
   const prefix = changePct > 0 ? '+' : '';
   return `${prefix}${changePct.toFixed(2)}%`;
 }
+
+export function getScoreColor(score?: number | null): string {
+  if (score == null) return colors.textMuted;
+  if (score >= 70) return colors.changeUp;
+  if (score >= 40) return '#faad14';
+  return colors.changeDown;
+}
+
+export function getTrendLabel(trend?: string | null): string {
+  return trend || '--';
+}
+
+export function getActionLabel(action?: string | null): string {
+  return action || '--';
+}

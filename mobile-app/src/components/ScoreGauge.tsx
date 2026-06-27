@@ -3,12 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
-
-function getScoreColor(score: number): string {
-  if (score >= 70) return colors.changeUp;
-  if (score >= 40) return '#faad14';
-  return colors.changeDown;
-}
+import { getScoreColor } from '../utils/stockDisplay';
 
 type ScoreGaugeProps = {
   score: number;
@@ -55,9 +50,9 @@ const styles = StyleSheet.create({
   },
   scoreText: {
     ...typography.bodyStrong,
-    fontSize: 15,
-    fontWeight: '700',
-    minWidth: 28,
+    fontSize: 16,
+    fontWeight: '800',
+    minWidth: 30,
     textAlign: 'right',
   },
 });

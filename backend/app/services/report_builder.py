@@ -188,6 +188,8 @@ def build_analysis_report(
         "rsi12": rsi12,
         "volume_ratio": volume_ratio,
         "volume_signal": volume_signal,
+        "turnover_rate": quote.turnover_rate,
+        "amplitude": quote.amplitude,
     }
 
     logger.debug("报告构建完成: %s(%s), score=%s, action=%s",

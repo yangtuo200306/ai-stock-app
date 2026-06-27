@@ -80,91 +80,104 @@ export default function ReportDetailScreen() {
           {report.stock_name} ({report.stock_code})
         </Text>
 
-        <MetricRow label="当前价格" value={report.price} style={styles.metricRow} />
-        <ScoreGauge score={report.score} />
-        <MetricRow label="操作建议" value={report.action} style={styles.metricRow} />
-        <MetricRow label="趋势判断" value={report.trend} style={styles.metricRow} />
+        {/* 行情概览 */}
+        <Text style={styles.sectionTitle}>行情概览</Text>
+        <View style={styles.sectionCard}>
+          <ScoreGauge score={report.score} />
 
-        {report.indicators?.change_pct != null && (
-          <MetricRow
-            label="涨跌幅"
-            value={formatChangePct(Number(report.indicators.change_pct))}
-            valueColor={getChangeColor(Number(report.indicators.change_pct))}
-            style={styles.metricRow}
-          />
-        )}
+          <MetricRow label="趋势" value={report.trend} style={styles.metricRow} />
+          <MetricRow label="建议" value={report.action} style={styles.metricRow} />
 
-        {report.indicators?.source != null && (
-          <MetricRow label="数据来源" value={String(report.indicators.source)} style={styles.metricRow} />
-        )}
+          {report.indicators?.change_pct != null && (
+            <MetricRow
+              label="涨跌幅"
+              value={formatChangePct(Number(report.indicators.change_pct))}
+              valueColor={getChangeColor(Number(report.indicators.change_pct))}
+              style={styles.metricRow}
+            />
+          )}
 
-        {report.indicators?.fetched_at != null && (
-          <MetricRow label="行情获取时间" value={String(report.indicators.fetched_at)} style={styles.metricRow} />
-        )}
+          {report.indicators?.turnover_rate != null && (
+            <MetricRow label="换手率" value={`${report.indicators.turnover_rate}%`} style={styles.metricRow} />
+          )}
 
-        {report.indicators?.ma5 != null && (
-          <>
-            <Text style={styles.sectionTitle}>技术指标</Text>
-            <MetricRow label="MA5" value={report.indicators.ma5} style={styles.metricRow} />
-            <MetricRow label="MA10" value={report.indicators.ma10} style={styles.metricRow} />
-            <MetricRow label="MA20" value={report.indicators.ma20} style={styles.metricRow} />
-          </>
-        )}
+          {report.indicators?.amplitude != null && (
+            <MetricRow label="振幅" value={`${report.indicators.amplitude}%`} style={styles.metricRow} />
+          )}
 
-        {report.indicators?.bias_ma5 != null && (
-          <>
-            <Text style={styles.sectionTitle}>乖离率</Text>
-            <MetricRow label="相对 MA5" value={`${report.indicators.bias_ma5}%`} style={styles.metricRow} />
-            <MetricRow label="相对 MA10" value={`${report.indicators.bias_ma10}%`} style={styles.metricRow} />
-            <MetricRow label="相对 MA20" value={`${report.indicators.bias_ma20}%`} style={styles.metricRow} />
-          </>
-        )}
+          {report.indicators?.volume_signal != null && (
+            <MetricRow
+              label="成交量"
+              value={
+                report.indicators.volume_ratio != null
+                  ? `${report.indicators.volume_signal}（比值 ${report.indicators.volume_ratio}）`
+                  : report.indicators.volume_signal
+              }
+              style={styles.metricRow}
+              multiline
+            />
+          )}
+        </View>
 
-        {report.indicators?.ma_trend != null && (
-          <MetricRow label="均线趋势" value={report.indicators.ma_trend} style={styles.metricRow} />
-        )}
+        {/* 技术指标 */}
+        <Text style={styles.sectionTitle}>技术指标</Text>
+        <View style={styles.sectionCard}>
+          {report.indicators?.ma5 != null && (
+            <MetricRow label="MA5（5日均线）" value={report.indicators.ma5} style={styles.metricRow} />
+          )}
+          {report.indicators?.ma10 != null && (
+            <MetricRow label="MA10（10日均线）" value={report.indicators.ma10} style={styles.metricRow} />
+          )}
+          {report.indicators?.ma20 != null && (
+            <MetricRow label="MA20（20日均线）" value={report.indicators.ma20} style={styles.metricRow} />
+          )}
+          {report.indicators?.ma_trend != null && (
+            <MetricRow label="均线趋势" value={report.indicators.ma_trend} style={styles.metricRow} />
+          )}
+          {report.indicators?.rsi6 != null && (
+            <MetricRow label="RSI(6)（相对强弱指标）" value={report.indicators.rsi6} style={styles.metricRow} />
+          )}
+          {report.indicators?.bias_ma5 != null && (
+            <MetricRow label="乖离率 MA5" value={`${report.indicators.bias_ma5}%`} style={styles.metricRow} />
+          )}
+          {report.indicators?.bias_ma10 != null && (
+            <MetricRow label="乖离率 MA10" value={`${report.indicators.bias_ma10}%`} style={styles.metricRow} />
+          )}
+          {report.indicators?.bias_ma20 != null && (
+            <MetricRow label="乖离率 MA20" value={`${report.indicators.bias_ma20}%`} style={styles.metricRow} />
+          )}
+        </View>
 
-        {report.indicators?.rsi6 != null && (
-          <>
-            <Text style={styles.sectionTitle}>RSI</Text>
-            <MetricRow label="RSI(6)" value={report.indicators.rsi6} style={styles.metricRow} />
-            <MetricRow label="RSI(12)" value={report.indicators.rsi12} style={styles.metricRow} />
-          </>
-        )}
+        {/* 摘要 */}
+        <Text style={styles.sectionTitle}>摘要</Text>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryText}>{report.summary}</Text>
+        </View>
 
-        {report.indicators?.volume_signal != null && (
-          <>
-            <Text style={styles.sectionTitle}>成交量</Text>
-            <MetricRow label="信号" value={report.indicators.volume_signal} style={styles.metricRow} />
-            {report.indicators.volume_ratio != null && (
-              <MetricRow label="比值" value={report.indicators.volume_ratio} style={styles.metricRow} />
-            )}
-          </>
-        )}
-
+        {/* 评分原因 */}
         {report.indicators?.score_reasons != null &&
           report.indicators.score_reasons.length > 0 && (
             <>
               <Text style={styles.sectionTitle}>评分原因</Text>
-              {report.indicators.score_reasons.map((reason, index) => (
-                <Text key={index} style={styles.reasonItem}>
-                  - {reason}
-                </Text>
-              ))}
+              <View style={styles.sectionCard}>
+                {report.indicators.score_reasons.map((reason, index) => (
+                  <Text key={index} style={styles.reasonItem}>- {reason}</Text>
+                ))}
+              </View>
             </>
           )}
 
-        <Text style={styles.sectionTitle}>摘要</Text>
-        <Text style={styles.summaryText}>{report.summary}</Text>
-
+        {/* 风险提示 */}
         {report.risks && report.risks.length > 0 && (
           <>
             <Text style={styles.sectionTitle}>风险提示</Text>
-            {report.risks.map((risk, index) => (
-              <Text key={index} style={styles.riskItem}>
-                - {risk}
-              </Text>
-            ))}
+            <View style={styles.riskCard}>
+              {report.risks.map((risk, index) => (
+                <Text key={index} style={styles.riskItem}>
+                  ⚠️ {risk}
+                </Text>
+              ))}
+            </View>
           </>
         )}
 
@@ -215,6 +228,25 @@ const styles = StyleSheet.create({
     marginTop: spacing.xxl,
     marginBottom: spacing.md,
   },
+  sectionCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 10,
+    padding: spacing.md,
+  },
+  summaryCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 10,
+    padding: spacing.md,
+  },
+  riskCard: {
+    backgroundColor: colors.dangerSoft,
+    borderRadius: 10,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  reasonsContainer: {
+    marginBottom: spacing.sm,
+  },
   summaryText: {
     ...typography.longText,
     color: colors.textSecondary,
@@ -222,12 +254,11 @@ const styles = StyleSheet.create({
   riskItem: {
     ...typography.body,
     color: colors.danger,
-    marginBottom: spacing.sm,
   },
   reasonItem: {
     ...typography.body,
-    color: colors.primary,
-    marginBottom: spacing.sm,
+    color: colors.textSecondary,
+    marginBottom: 2,
   },
   dateText: {
     ...typography.helper,

@@ -14,6 +14,8 @@ export interface ReportIndicators {
   rsi12?: number;
   volume_ratio?: number;
   volume_signal?: string;
+  turnover_rate?: number;
+  amplitude?: number;
 }
 
 export interface Report {

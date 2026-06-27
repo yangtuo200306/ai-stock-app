@@ -91,10 +91,12 @@ ai-stock-app/
 | v1.4 | 阶段二：我的页精修（头像区、可折叠开发者设置、版本常量、登录页视觉升级） |
 | v1.5 | 阶段二：公共组件收口（AppButton compact 变体、StateView 紧凑按钮、RecordCard 颜色统一） |
 | v1.6 | 阶段二：UX 优化（导航栏统一 + 底部栏美化 + 布局修复 + 交互优化 + 名称清理） |
+| v1.7 | 工程化与部署（阿里云 ECS 上线） |
+| v1.8 | 股票数据体系优化（统一数据结构、优化展示、完善指标） |
 
 ## 文档索引
 
-- [代码问题与隐患记录](code-review-notes.md) — 已发现的 145 个问题及状态汇总
+- [进阶学习记录](learning-notes.md) — v1.8+ 进阶学习知识点
 - [常见问题与排查手册](common-issues.md) — 开发中反复遇到的问题及解决方式
-- [历史文档归档](archive/) — v0.1~v1.6 的计划、总结和学习笔记
-  - 版本总结：v0.1~v0.9、[v1.0](archive/releases/v1.0-summary.md)、[v1.1](archive/releases/v1.1-summary.md)、[v1.2](archive/releases/v1.2-summary.md)、[v1.3](archive/releases/v1.3-summary.md)、[v1.4](archive/releases/v1.4-summary.md)、[v1.5](archive/releases/v1.5-summary.md)、[v1.6](archive/releases/v1.6-summary.md)
+- [历史文档归档](archive/) — 各版本的计划、总结和学习笔记
+  - 版本总结：v0.1~v0.9、[v1.0](archive/releases/v1.0-summary.md)、[v1.1](archive/releases/v1.1-summary.md)、[v1.2](archive/releases/v1.2-summary.md)、[v1.3](archive/releases/v1.3-summary.md)、[v1.4](archive/releases/v1.4-summary.md)、[v1.5](archive/releases/v1.5-summary.md)、[v1.6](archive/releases/v1.6-summary.md)、[v1.7](archive/releases/v1.7-summary.md)、[v1.8](archive/releases/v1.8-summary.md)

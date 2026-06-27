@@ -1,4 +1,5 @@
 import type { AskMessage } from './ask';
+import type { ReportIndicators } from './report';
 
 export interface RecordItem {
   id: number;
@@ -16,6 +17,7 @@ export interface RecordItem {
     score?: number;
     action?: string;
     trend?: string;
+    indicators?: ReportIndicators;
     model?: string | null;
     task_id?: string;
   };
@@ -41,6 +43,7 @@ export interface RecordDetail {
     score?: number;
     action?: string;
     trend?: string;
+    indicators?: ReportIndicators;
     model?: string | null;
     task_id?: string;
   };

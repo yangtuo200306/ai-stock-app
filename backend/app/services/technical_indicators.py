@@ -1,4 +1,4 @@
-from app.services.market_data import StockDailyPrice
+from app.services.market_data import StockDailyPrice, StockQuote
 
 
 def calculate_ma(close_prices: list[float], period: int) -> float:
@@ -71,8 +71,9 @@ def determine_volume_signal(volume_ratio: float) -> str:
 
 
 def build_technical_indicators(
-    current_price: float, history: list[StockDailyPrice]
+    quote: StockQuote, history: list[StockDailyPrice]
 ) -> dict:
+    current_price = quote.price
     close_prices = [item.close for item in history]
 
     ma5 = calculate_ma(close_prices, 5)
@@ -91,6 +92,9 @@ def build_technical_indicators(
     volume_ratio = calculate_volume_ratio(history)
     volume_signal = determine_volume_signal(volume_ratio)
 
+    turnover_rate = quote.turnover_rate
+    amplitude = quote.amplitude
+
     return {
         "ma5": ma5,
         "ma10": ma10,
@@ -103,4 +107,6 @@ def build_technical_indicators(
         "rsi12": rsi12,
         "volume_ratio": volume_ratio,
         "volume_signal": volume_signal,
+        "turnover_rate": turnover_rate,
+        "amplitude": amplitude,
     }

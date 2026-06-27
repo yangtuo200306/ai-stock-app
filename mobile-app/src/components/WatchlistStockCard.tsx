@@ -5,7 +5,7 @@ import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { getRecordTypeColor, getRecordTypeLabel } from '../utils/recordDisplay';
 import { getTaskStatusColor, getTaskStatusLabel } from '../utils/taskStatusDisplay';
-import { formatChangePct, getChangeColor } from '../utils/stockDisplay';
+import { formatChangePct, getChangeColor, getScoreColor } from '../utils/stockDisplay';
 import type { Stock } from '../types';
 
 type WatchlistStockCardProps = {
@@ -61,6 +61,29 @@ export function WatchlistStockCard({
             </View>
           ) : null}
         </View>
+
+        {/* Score + Trend + Action tags */}
+        {(stock.score != null || stock.trend || stock.action) ? (
+          <View style={styles.tagsRow}>
+            {stock.score != null ? (
+              <View style={[styles.tag, { backgroundColor: getScoreColor(stock.score) + '20' }]}>
+                <Text style={[styles.tagText, { color: getScoreColor(stock.score) }]}>
+                  评分 {stock.score}
+                </Text>
+              </View>
+            ) : null}
+            {stock.trend ? (
+              <View style={[styles.tag, { backgroundColor: colors.surfaceMuted }]}>
+                <Text style={styles.tagText}>趋势 {stock.trend}</Text>
+              </View>
+            ) : null}
+            {stock.action ? (
+              <View style={[styles.tag, { backgroundColor: colors.primarySoft }]}>
+                <Text style={[styles.tagText, { color: colors.primary }]}>建议 {stock.action}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         {/* Summary section */}
         <View style={styles.summarySection}>
@@ -194,6 +217,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 16,
     color: colors.textInverse,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  tag: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  tagText: {
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 16,
+    color: colors.textSecondary,
   },
   summarySection: {
     marginTop: spacing.md,

@@ -8,6 +8,7 @@ import type { RootTabParamList } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useAskStore } from '../stores/askStore';
 import { AppButton } from '../components/AppButton';
+import { AppCard } from '../components/AppCard';
 import { LoginRequiredView } from '../components/LoginRequiredView';
 import { MessageBubble } from '../components/MessageBubble';
 import { MetricRow } from '../components/MetricRow';
@@ -209,7 +210,7 @@ export default function AskScreen() {
 
             {/* Result Card */}
             {latestResult ? (
-              <View style={styles.resultCard}>
+              <AppCard style={{ marginTop: spacing.sm }}>
                 <Text style={styles.stockName}>
                   {latestResult.stock_name}（{latestResult.stock_code}）
                 </Text>
@@ -217,36 +218,52 @@ export default function AskScreen() {
                 {/* 行情概览 */}
                 <Text style={styles.sectionTitle}>行情概览</Text>
                 <View style={styles.sectionCard}>
-                  <MetricRow label="当前价" value={latestResult.price} compact />
+                  <ScoreGauge score={latestResult.score} />
+                  <MetricRow label="趋势" value={latestResult.trend} compact />
+                  <MetricRow label="建议" value={latestResult.action} compact />
                   <MetricRow
                     label="涨跌幅"
                     value={formatChangePct(latestResult.change_pct)}
                     valueColor={getChangeColor(latestResult.change_pct)}
                     compact
                   />
-                  <MetricRow label="趋势" value={latestResult.trend} compact />
-                  <MetricRow label="建议" value={latestResult.action} compact />
-                  <ScoreGauge score={latestResult.score} />
+                  {latestResult.indicators?.turnover_rate != null && (
+                    <MetricRow label="换手率" value={`${latestResult.indicators.turnover_rate}%`} compact />
+                  )}
+                  {latestResult.indicators?.amplitude != null && (
+                    <MetricRow label="振幅" value={`${latestResult.indicators.amplitude}%`} compact />
+                  )}
+                  <MetricRow
+                    label="成交量"
+                    value={
+                      latestResult.indicators?.volume_ratio != null
+                        ? `${latestResult.indicators.volume_signal ?? '-'}（比值 ${latestResult.indicators.volume_ratio}）`
+                        : latestResult.indicators?.volume_signal
+                    }
+                    compact
+                    multiline
+                  />
                 </View>
 
                 {/* 技术指标 */}
                 <Text style={styles.sectionTitle}>技术指标</Text>
                 <View style={styles.sectionCard}>
-                  <MetricRow label="MA5" value={latestResult.indicators.ma5} compact />
-                  <MetricRow label="MA10" value={latestResult.indicators.ma10} compact />
-                  <MetricRow label="MA20" value={latestResult.indicators.ma20} compact />
-                  <MetricRow label="RSI(6)" value={latestResult.indicators.rsi6} compact />
-                  <MetricRow label="RSI(12)" value={latestResult.indicators.rsi12} compact />
-                  <MetricRow
-                    label="成交量"
-                    value={
-                      latestResult.indicators.volume_ratio != null
-                        ? `${latestResult.indicators.volume_signal ?? '-'}（比值 ${latestResult.indicators.volume_ratio}）`
-                        : latestResult.indicators.volume_signal
-                    }
-                    compact
-                    multiline
-                  />
+                  <MetricRow label="MA5（5日均线）" value={latestResult.indicators?.ma5} compact />
+                  <MetricRow label="MA10（10日均线）" value={latestResult.indicators?.ma10} compact />
+                  <MetricRow label="MA20（20日均线）" value={latestResult.indicators?.ma20} compact />
+                  {latestResult.indicators?.ma_trend != null && (
+                    <MetricRow label="均线趋势" value={latestResult.indicators.ma_trend} compact />
+                  )}
+                  <MetricRow label="RSI(6)（相对强弱指标）" value={latestResult.indicators?.rsi6} compact />
+                  {latestResult.indicators?.bias_ma5 != null && (
+                    <MetricRow label="乖离率 MA5" value={`${latestResult.indicators.bias_ma5}%`} compact />
+                  )}
+                  {latestResult.indicators?.bias_ma10 != null && (
+                    <MetricRow label="乖离率 MA10" value={`${latestResult.indicators.bias_ma10}%`} compact />
+                  )}
+                  {latestResult.indicators?.bias_ma20 != null && (
+                    <MetricRow label="乖离率 MA20" value={`${latestResult.indicators.bias_ma20}%`} compact />
+                  )}
                 </View>
 
                 {/* 风险提示 */}
@@ -271,7 +288,7 @@ export default function AskScreen() {
                   disabled={addToWatchlistLoading}
                   style={styles.watchlistButton}
                 />
-              </View>
+              </AppCard>
             ) : null}
           </>
         )}
@@ -450,15 +467,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  // Result Card
-  resultCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.cardPadding,
-    marginTop: spacing.sm,
-  },
   stockName: {
     ...typography.sectionTitle,
     color: colors.textPrimary,

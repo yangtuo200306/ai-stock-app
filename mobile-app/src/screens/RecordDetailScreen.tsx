@@ -147,8 +147,16 @@ export default function RecordDetailScreen() {
         <View style={styles.sectionBlock}>
           <Text style={styles.sectionLabel}>行情摘要</Text>
           <View style={styles.metricsSection}>
-            {record.metadata.price != null && (
-              <MetricRow label="当前价" value={record.metadata.price} style={styles.metricRow} />
+            {record.metadata.score != null && (
+              <ScoreGauge score={record.metadata.score} />
+            )}
+
+            {record.metadata.trend != null && (
+              <MetricRow label="趋势" value={record.metadata.trend} style={styles.metricRow} />
+            )}
+
+            {record.metadata.action != null && (
+              <MetricRow label="建议" value={record.metadata.action} style={styles.metricRow} />
             )}
 
             {record.metadata.change_pct != null && (
@@ -160,19 +168,63 @@ export default function RecordDetailScreen() {
               />
             )}
 
-            {record.metadata.score != null && (
-              <ScoreGauge score={record.metadata.score} />
+            {record.metadata.indicators?.turnover_rate != null && (
+              <MetricRow label="换手率" value={`${record.metadata.indicators.turnover_rate}%`} style={styles.metricRow} />
             )}
 
-            {record.metadata.action != null && (
-              <MetricRow label="建议" value={record.metadata.action} style={styles.metricRow} />
+            {record.metadata.indicators?.amplitude != null && (
+              <MetricRow label="振幅" value={`${record.metadata.indicators.amplitude}%`} style={styles.metricRow} />
             )}
 
-            {record.metadata.trend != null && (
-              <MetricRow label="趋势" value={record.metadata.trend} style={styles.metricRow} />
-            )}
+            {record.metadata.indicators?.volume_ratio != null ? (
+              <MetricRow
+                label="成交量"
+                value={`${record.metadata.indicators.volume_signal ?? '-'}（比值 ${record.metadata.indicators.volume_ratio}）`}
+                style={styles.metricRow}
+                multiline
+              />
+            ) : record.metadata.indicators?.volume_signal != null ? (
+              <MetricRow
+                label="成交量"
+                value={record.metadata.indicators.volume_signal}
+                style={styles.metricRow}
+              />
+            ) : null}
           </View>
         </View>
+
+        {/* Technical indicators section */}
+        {record.metadata.indicators ? (
+          <View style={styles.sectionBlock}>
+            <Text style={styles.sectionLabel}>技术指标</Text>
+            <View style={styles.metricsSection}>
+              {record.metadata.indicators.ma5 != null && (
+                <MetricRow label="MA5（5日均线）" value={record.metadata.indicators.ma5} style={styles.metricRow} />
+              )}
+              {record.metadata.indicators.ma10 != null && (
+                <MetricRow label="MA10（10日均线）" value={record.metadata.indicators.ma10} style={styles.metricRow} />
+              )}
+              {record.metadata.indicators.ma20 != null && (
+                <MetricRow label="MA20（20日均线）" value={record.metadata.indicators.ma20} style={styles.metricRow} />
+              )}
+              {record.metadata.indicators.ma_trend != null && (
+                <MetricRow label="均线趋势" value={record.metadata.indicators.ma_trend} style={styles.metricRow} />
+              )}
+              {record.metadata.indicators.rsi6 != null && (
+                <MetricRow label="RSI(6)（相对强弱指标）" value={record.metadata.indicators.rsi6} style={styles.metricRow} />
+              )}
+              {record.metadata.indicators.bias_ma5 != null && (
+                <MetricRow label="乖离率 MA5" value={`${record.metadata.indicators.bias_ma5}%`} style={styles.metricRow} />
+              )}
+              {record.metadata.indicators.bias_ma10 != null && (
+                <MetricRow label="乖离率 MA10" value={`${record.metadata.indicators.bias_ma10}%`} style={styles.metricRow} />
+              )}
+              {record.metadata.indicators.bias_ma20 != null && (
+                <MetricRow label="乖离率 MA20" value={`${record.metadata.indicators.bias_ma20}%`} style={styles.metricRow} />
+              )}
+            </View>
+          </View>
+        ) : null}
 
         {/* Action buttons */}
         <View style={styles.actionRow}>

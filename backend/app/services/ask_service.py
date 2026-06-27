@@ -119,6 +119,7 @@ def _write_or_update_ask_record(
         "score": report["score"],
         "action": report["action"],
         "trend": report["trend"],
+        "indicators": report["indicators"],
         "answer_type": answer_type,
         "ai_status": ai_status,
         "model": model,

@@ -215,7 +215,7 @@ backend/app/
 | 阶段二（公共组件收口） | v1.5 | ✅ 已完成 |
 | 阶段二（UX 优化与体验修复） | v1.6 | ✅ 已完成 |
 | 阶段三（工程化与部署） | v1.7 | ✅ 已完成 |
-| 阶段四（股票数据体系优化） | v1.8 | 📅 待执行 |
+| 阶段四（股票数据体系优化） | v1.8 | ✅ 已完成 |
 
 > 版本号仅为示意，具体每个版本做多少、版本号怎么定，由你决定。
 
@@ -233,8 +233,8 @@ backend/app/
 | `docs/archive/plans/v1.4-plan.md` | v1.4 我的页精修计划（已完成） |
 | `docs/archive/plans/v1.5-plan.md` | v1.5 公共组件收口计划（已完成） |
 | `docs/archive/plans/v1.6-plan.md` | v1.6 UX 优化计划（已完成） |
-| `docs/archive/releases/v1.7-summary.md` | v1.7 工程化与部署总结（已完成） |
-| `docs/v1.8-plan.md` | v1.8 股票数据体系优化计划（待执行） |
-| `docs/archive/learning-notes-v1.0-v1.7.md` | v1.0~v1.7 学习笔记（已归档） |
-| `docs/code-review-notes.md` | 代码问题与隐患记录 |
+| `docs/archive/releases/v1.8-summary.md` | v1.8 股票数据体系优化总结（已完成） |
+| `docs/archive/learning/learning-notes-v1.0-v1.7.md` | v1.0~v1.7 学习笔记（已归档） |
+| `docs/learning-notes.md` | v1.8+ 进阶学习记录 |
+| `docs/archive/code-review-notes.md` | 代码问题与隐患记录（已归档） |
 | `docs/README.md` | 项目总览 |

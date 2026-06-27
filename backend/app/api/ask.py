@@ -19,6 +19,7 @@ from app.services.ask_service import (
     _write_or_update_ask_record,
 )
 from app.services.llm_client import LlmError, ask_llm
+from app.services.indicators_schema import Indicators
 from app.services.market_data import MarketDataError, get_stock_history, get_stock_quote
 from app.services.report_builder import build_analysis_report
 from app.services.stock_resolver import get_supported_names, resolve_stock_input
@@ -48,7 +49,7 @@ class AskResponse(BaseModel):
     answer_type: str = "rule"
     ai_status: str = "ok"
     risks: list[str]
-    indicators: dict
+    indicators: Indicators
     model: str | None = None
     session_id: str | None = None
     message_id: int | None = None
@@ -100,7 +101,7 @@ def ask_stock(ask: AskCreate, user_id: str = Depends(get_current_user_id)):
     except MarketDataError as error:
         raise api_error(400, ErrorCode.MARKET_DATA_ERROR, str(error)) from error
 
-    technicals = build_technical_indicators(quote.price, history)
+    technicals = build_technical_indicators(quote, history)
     report = build_analysis_report(quote, technicals)
 
     # --- generate answer ---
