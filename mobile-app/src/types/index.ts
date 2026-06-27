@@ -3,3 +3,4 @@ export * from './report';
 export * from './ask';
 export * from './record';
 export * from './navigation';
+export * from './news';

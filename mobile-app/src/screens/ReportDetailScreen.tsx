@@ -10,6 +10,7 @@ import type { Report, RootTabParamList } from '../types';
 import { AppCard } from '../components/AppCard';
 import { LoginRequiredView } from '../components/LoginRequiredView';
 import { MetricRow } from '../components/MetricRow';
+import { NewsCard } from '../components/NewsCard';
 import { ScoreGauge } from '../components/ScoreGauge';
 import { StateView } from '../components/StateView';
 import { colors } from '../theme/colors';
@@ -179,6 +180,11 @@ export default function ReportDetailScreen() {
               ))}
             </View>
           </>
+        )}
+
+        {/* 相关资讯 */}
+        {report.news && report.news.length > 0 && (
+          <NewsCard news={report.news} />
         )}
 
         <Text style={styles.dateText}>报告生成时间：{report.created_at}</Text>

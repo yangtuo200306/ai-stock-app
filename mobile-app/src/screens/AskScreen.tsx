@@ -35,8 +35,8 @@ export default function AskScreen() {
   const navigation = useNavigation<AskTabNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
   const {
-    sessionId, messages, question, isLoading, error, latestResult,
-    setQuestion, handleAsk, handleNewSession, handleAddToWatchlist, restoreSession,
+    sessionId, messages, question, isLoading, isStreaming, error, latestResult,
+    setQuestion, handleAskStream, handleNewSession, handleAddToWatchlist, restoreSession,
   } = useAskStore();
   const [addToWatchlistLoading, setAddToWatchlistLoading] = useState(false);
   const [selectedStock, setSelectedStock] = useState<{ code: string; name: string } | null>(null);
@@ -76,11 +76,11 @@ export default function AskScreen() {
   }, [handleNewSession]);
 
   const onAsk = useCallback(() => {
-    handleAsk(selectedStock?.code).then(() => {
+    handleAskStream(selectedStock?.code).then(() => {
       setSelectedStock(null);
       scrollToEnd();
     });
-  }, [handleAsk, selectedStock, scrollToEnd]);
+  }, [handleAskStream, selectedStock, scrollToEnd]);
 
   const onQuickQuestion = useCallback((q: string) => {
     setQuestion(q);
@@ -89,10 +89,10 @@ export default function AskScreen() {
   }, [setQuestion]);
 
   const onRetry = useCallback(() => {
-    handleAsk(selectedStock?.code).then(() => {
+    handleAskStream(selectedStock?.code).then(() => {
       scrollToEnd();
     });
-  }, [handleAsk, selectedStock, scrollToEnd]);
+  }, [handleAskStream, selectedStock, scrollToEnd]);
 
   const onAddToWatchlist = useCallback(async () => {
     setAddToWatchlistLoading(true);
@@ -185,6 +185,8 @@ export default function AskScreen() {
                   role={msg.role}
                   content={msg.content}
                   answerType={msg.answer_type}
+                  isStreaming={isLastAssistant && isStreaming}
+                  news={isLastAssistant ? latestResult?.news : undefined}
                   onRetry={showRetry ? onRetry : undefined}
                 />
               );

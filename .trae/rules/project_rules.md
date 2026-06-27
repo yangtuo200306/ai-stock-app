@@ -36,6 +36,15 @@
 ### 6. 报错处理
 - 出现报错时，先解释报错含义，再给解决步骤
 
+### 7. 计划阶段必须做影响面分析
+- 制定计划时，不能写"和 XX 一样"跳过细节，必须列出所有需要协同修改的文件
+- 至少检查以下维度：
+  - 数据链路：新增字段/接口时，检查每个环节是否透传
+  - 数据库：是否需要新建表、加字段、迁移
+  - 前后端类型：新增字段时两端类型是否同步
+  - 错误处理：新路径是否有降级/兜底
+  - 配置：是否需要新增环境变量
+
 ---
 
 ## 二、项目事实（参考用）
@@ -44,6 +53,7 @@
 - 后端：Python FastAPI + SQLite
 - 前端：React Native + Expo + TypeScript
 - 行情源：efinance（主源）+ 新浪（fallback）
+- 新闻源：akshare 东方财富（主源）+ 搜狗（fallback）
 - AI：火山方舟 DeepSeek
 - 导航：React Navigation 6（Tab + Stack）
 - 状态：Zustand（store）+ AuthContext

@@ -113,4 +113,58 @@ export async function apiDelete(path: string) {
   return handleResponse(res);
 }
 
+export async function apiPostStream(
+  path: string,
+  body: object,
+  onChunk: (text: string) => void,
+  onDone: (headers: Headers) => void,
+  onError: (error: string) => void,
+): Promise<void> {
+  const base = await getBaseUrl();
+  const token = await getToken();
+  const response = await fetch(`${base}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    let message = '请求失败';
+    try {
+      const err = await response.json();
+      const { message: msg } = extractErrorMessage(err);
+      message = msg;
+    } catch {
+      // ignore
+    }
+    onError(message);
+    return;
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    onError('响应流不可用');
+    return;
+  }
+
+  const decoder = new TextDecoder();
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const text = decoder.decode(value, { stream: true });
+      onChunk(text);
+    }
+  } catch (err) {
+    onError(err instanceof Error ? err.message : '流读取失败');
+    return;
+  }
+
+  onDone(response.headers);
+}
+
 export { STORAGE_KEYS };

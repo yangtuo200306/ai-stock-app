@@ -55,7 +55,7 @@ def get_report(report_id: int, user_id: str = Depends(get_current_user_id)):
         row = connection.execute(
             """
             SELECT id, stock_code, stock_name, price, score, action, trend,
-                   summary, risks_json, indicators_json, created_at
+                   summary, risks_json, indicators_json, news_json, created_at
             FROM reports
             WHERE id = ? AND user_id = ?
             """,
@@ -76,5 +76,6 @@ def get_report(report_id: int, user_id: str = Depends(get_current_user_id)):
         "summary": row["summary"],
         "risks": json.loads(row["risks_json"]),
         "indicators": json.loads(row["indicators_json"]),
+        "news": json.loads(row["news_json"]) if row["news_json"] else [],
         "created_at": row["created_at"],
     }

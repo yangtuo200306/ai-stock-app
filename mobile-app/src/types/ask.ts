@@ -1,4 +1,5 @@
 import type { ReportIndicators } from './report';
+import type { NewsItem } from './news';
 
 export interface AskResponse {
   stock_code: string;
@@ -19,6 +20,7 @@ export interface AskResponse {
   message_id?: number | null;
   is_new_session?: boolean;
   conversation_title?: string;
+  news?: NewsItem[];
 }
 
 export interface AskMessage {

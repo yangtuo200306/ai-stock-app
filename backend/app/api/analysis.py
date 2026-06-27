@@ -10,6 +10,7 @@ from app.errors import ErrorCode, api_error
 
 logger = logging.getLogger(__name__)
 from app.services.market_data import MarketDataError, get_stock_quote, get_stock_history
+from app.services.news_fetcher import fetch_news
 from app.services.technical_indicators import build_technical_indicators
 from app.services.report_builder import build_analysis_report
 
@@ -96,14 +97,17 @@ def create_analysis_task(analysis: AnalysisCreate, user_id: str = Depends(get_cu
     technicals = build_technical_indicators(quote, history)
     report = build_analysis_report(quote, technicals)
 
+    # --- fetch news ---
+    news = fetch_news(analysis.stock_code, report["stock_name"])
+
     with get_connection() as connection:
         cursor = connection.execute(
             """
             INSERT INTO reports (
                 stock_code, stock_name, price, score, action, trend,
-                summary, risks_json, indicators_json, user_id
+                summary, risks_json, indicators_json, news_json, user_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 report["stock_code"],
@@ -115,6 +119,7 @@ def create_analysis_task(analysis: AnalysisCreate, user_id: str = Depends(get_cu
                 report["summary"],
                 json.dumps(report["risks"], ensure_ascii=False),
                 json.dumps(report["indicators"], ensure_ascii=False),
+                json.dumps(news, ensure_ascii=False),
                 user_id,
             ),
         )

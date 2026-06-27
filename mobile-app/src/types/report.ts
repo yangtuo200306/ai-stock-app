@@ -1,3 +1,5 @@
+import type { NewsItem } from './news';
+
 export interface ReportIndicators {
   change_pct?: number;
   source?: string;
@@ -30,6 +32,7 @@ export interface Report {
   risks: string[];
   indicators: ReportIndicators;
   created_at: string;
+  news?: NewsItem[];
 }
 
 export interface ReportHistoryItem {

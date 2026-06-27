@@ -35,6 +35,7 @@ npm run web -- --clear
 | 后端 | Python FastAPI + SQLite |
 | 前端 | React Native + Expo + TypeScript |
 | 行情源 | efinance（主源）+ 新浪（fallback） |
+| 新闻源 | akshare 东方财富（主源）+ 搜狗（fallback） |
 | AI | 火山方舟 DeepSeek |
 | 导航 | React Navigation 6（Tab + Stack） |
 | 状态 | Zustand（store）+ AuthContext |
@@ -93,6 +94,9 @@ ai-stock-app/
 | v1.6 | 阶段二：UX 优化（导航栏统一 + 底部栏美化 + 布局修复 + 交互优化 + 名称清理） |
 | v1.7 | 工程化与部署（阿里云 ECS 上线） |
 | v1.8 | 股票数据体系优化（统一数据结构、优化展示、完善指标） |
+| v1.9.1 | Prompt 工程优化（System Prompt 增强、回答结构强制、数据分类呈现） |
+| v1.9.2 | 流式响应（SSE 逐字输出、光标闪烁、LLM 失败降级、记录保存） |
+| v1.9.3 | 资讯/新闻集成（akshare 新闻源、Prompt 注入、前端新闻卡片、分析报告相关资讯） |
 
 ## 文档索引
 

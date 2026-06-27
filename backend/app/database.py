@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_USER_ID = "default_user"
 
 # 数据库 Schema 版本管理
-CURRENT_SCHEMA_VERSION = "V20260625_003_ensure_columns"
+CURRENT_SCHEMA_VERSION = "V20260625_004_add_news_json"
 
 MIGRATIONS = [
     {
@@ -31,6 +31,10 @@ MIGRATIONS = [
     {
         "version": "V20260625_003_ensure_columns",
         "description": "补充缺失列（report_id, user_id, session_id, updated_at）",
+    },
+    {
+        "version": "V20260625_004_add_news_json",
+        "description": "reports 表新增 news_json 列，用于存储相关新闻",
     },
 ]
 
@@ -75,6 +79,8 @@ def _run_migration(connection, version: str):
         _migrate_stocks_table(connection)
     elif version == "V20260625_003_ensure_columns":
         _run_ensure_columns(connection)
+    elif version == "V20260625_004_add_news_json":
+        ensure_column(connection, "reports", "news_json", "TEXT DEFAULT '[]'")
 
 
 def _run_ensure_columns(connection):

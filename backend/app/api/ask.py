@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.config.settings import settings
@@ -18,9 +20,10 @@ from app.services.ask_service import (
     _get_ask_messages,
     _write_or_update_ask_record,
 )
-from app.services.llm_client import LlmError, ask_llm
+from app.services.llm_client import LlmError, ask_llm, ask_llm_stream
 from app.services.indicators_schema import Indicators
 from app.services.market_data import MarketDataError, get_stock_history, get_stock_quote
+from app.services.news_fetcher import fetch_news
 from app.services.report_builder import build_analysis_report
 from app.services.stock_resolver import get_supported_names, resolve_stock_input
 from app.services.technical_indicators import build_technical_indicators
@@ -55,6 +58,7 @@ class AskResponse(BaseModel):
     message_id: int | None = None
     is_new_session: bool = False
     conversation_title: str | None = None
+    news: list[dict] | None = None
 
 
 def _extract_stock_code(text: str) -> str | None:
@@ -104,6 +108,9 @@ def ask_stock(ask: AskCreate, user_id: str = Depends(get_current_user_id)):
     technicals = build_technical_indicators(quote, history)
     report = build_analysis_report(quote, technicals)
 
+    # --- fetch news ---
+    news = fetch_news(stock_code, report["stock_name"])
+
     # --- generate answer ---
     answer_type = "rule"
     ai_status = "fallback"
@@ -128,6 +135,7 @@ def ask_stock(ask: AskCreate, user_id: str = Depends(get_current_user_id)):
             indicators=report["indicators"],
             question=ask.question or f"{stock_code} 怎么样？",
             conversation_messages=conversation_messages,
+            news=news,
         )
         answer_type = "ai"
         ai_status = "ok"
@@ -192,4 +200,150 @@ def ask_stock(ask: AskCreate, user_id: str = Depends(get_current_user_id)):
         "message_id": message_id,
         "is_new_session": is_new_session,
         "conversation_title": title,
+        "news": news,
     }
+
+
+def _build_report(stock_code: str) -> dict:
+    """获取行情数据、计算指标、生成分析报告。"""
+    quote = get_stock_quote(stock_code)
+    history = get_stock_history(stock_code)
+    technicals = build_technical_indicators(quote, history)
+    return build_analysis_report(quote, technicals)
+
+
+@router.post("/ask/stream")
+def ask_stock_stream(
+    ask: AskCreate,
+    authorization: str = Header(...),
+):
+    user_id = get_current_user_id(authorization)
+
+    # --- resolve stock code ---
+    stock_code = None
+    if ask.stock_code:
+        stock_code = ask.stock_code.strip()
+    elif ask.question:
+        extracted = _extract_stock_code(ask.question)
+        if not extracted:
+            supported = "、".join(get_supported_names())
+            raise api_error(400, ErrorCode.STOCK_NOT_FOUND,
+                             f"问题中未找到 6 位股票代码或已支持的股票名称（当前支持：{supported}），请提供例如：600519 怎么看？")
+        stock_code = extracted
+    else:
+        raise api_error(400, ErrorCode.MISSING_STOCK_CODE, "请提供股票代码或包含股票代码的问题")
+
+    # --- fetch market data & build report ---
+    try:
+        report = _build_report(stock_code)
+    except MarketDataError as error:
+        raise api_error(400, ErrorCode.MARKET_DATA_ERROR, str(error)) from error
+
+    # --- fetch news ---
+    news = fetch_news(stock_code, report["stock_name"])
+
+    # --- resolve conversation context ---
+    conversation_messages = None
+    session = None
+    is_new_session = False
+    if ask.session_id:
+        session = _get_ask_session(ask.session_id, user_id)
+        if session:
+            conversation_messages = _get_ask_messages(ask.session_id, user_id)
+
+    # --- create session & write user message before streaming ---
+    answer_type = "ai"
+    ai_status = "ok"
+    model_name = settings.LLM_MODEL or None
+
+    if session:
+        session_id = session["session_id"]
+        title = session["title"]
+        _write_ask_message(session_id, user_id, "user", ask.question or "")
+    else:
+        title = _build_conversation_title(report["stock_name"], report["stock_code"])
+        session_id = _create_ask_session(
+            user_id, report["stock_code"], report["stock_name"], title, "",
+            ask.question or "", "", answer_type, ai_status, model_name,
+        )
+        _write_ask_message(session_id, user_id, "user", ask.question or "")
+        is_new_session = True
+
+    # --- build result data for frontend ---
+    result_data = json.dumps({
+        "stock_code": report["stock_code"],
+        "stock_name": report["stock_name"],
+        "price": report["price"],
+        "change_pct": report["indicators"]["change_pct"],
+        "trend": report["trend"],
+        "action": report["action"],
+        "score": report["score"],
+        "risks": report["risks"],
+        "indicators": report["indicators"],
+        "session_id": session_id,
+        "is_new_session": is_new_session,
+        "conversation_title": title,
+        "news": news,
+    })
+
+    # --- stream LLM answer with post-save ---
+    def _stream_and_save():
+        full_answer = ""
+        used_llm = True
+        try:
+            for chunk in ask_llm_stream(
+                stock_code=report["stock_code"],
+                stock_name=report["stock_name"],
+                price=report["price"],
+                change_pct=report["indicators"]["change_pct"],
+                trend=report["trend"],
+                action=report["action"],
+                score=report["score"],
+                summary=report["summary"],
+                risks=report["risks"],
+                indicators=report["indicators"],
+                question=ask.question or f"{stock_code} 怎么样？",
+                conversation_messages=conversation_messages,
+                news=news,
+            ):
+                full_answer += chunk
+                yield chunk
+        except LlmError:
+            logger.warning("LLM 流式调用失败，降级为规则回答: stock=%s", stock_code)
+            used_llm = False
+            rule_answer = _build_rule_answer(report)
+            full_answer = rule_answer
+            yield rule_answer
+        finally:
+            # save session & record after streaming ends
+            if full_answer:
+                summary = full_answer[:80] if len(full_answer) > 80 else full_answer
+                final_answer_type = "ai" if used_llm else "rule"
+                final_ai_status = "ok" if used_llm else "fallback"
+                if session:
+                    _update_ask_session(session_id, ask.question or "", full_answer, summary,
+                                        final_answer_type, final_ai_status, model_name)
+                    _write_ask_message(session_id, user_id, "assistant", full_answer,
+                                       answer_type=final_answer_type, ai_status=final_ai_status, model=model_name)
+                    _write_or_update_ask_record(
+                        report, ask.question or "", full_answer, final_answer_type, final_ai_status,
+                        model_name, user_id, session_id, is_new=False,
+                    )
+                else:
+                    _update_ask_session(session_id, ask.question or "", full_answer, summary,
+                                        final_answer_type, final_ai_status, model_name)
+                    _write_ask_message(session_id, user_id, "assistant", full_answer,
+                                       answer_type=final_answer_type, ai_status=final_ai_status, model=model_name)
+                    _write_or_update_ask_record(
+                        report, ask.question or "", full_answer, final_answer_type, final_ai_status,
+                        model_name, user_id, session_id, is_new=True,
+                    )
+
+    return StreamingResponse(
+        _stream_and_save(),
+        media_type="text/event-stream",
+        headers={
+            "X-Result-Data": result_data,
+            "Cache-Control": "no-cache",
+        },
+    )

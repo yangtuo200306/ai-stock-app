@@ -5,12 +5,16 @@ import * as Clipboard from 'expo-clipboard';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
+import type { NewsItem } from '../types';
+import { NewsCard } from './NewsCard';
 
 type MessageBubbleProps = {
   role: string;
   content: string;
   answerType?: string | null;
   onRetry?: () => void;
+  isStreaming?: boolean;
+  news?: NewsItem[];
   style?: StyleProp<ViewStyle>;
 };
 
@@ -80,7 +84,7 @@ const markdownStyles = {
   },
 };
 
-export function MessageBubble({ role, content, answerType, onRetry, style }: MessageBubbleProps) {
+export function MessageBubble({ role, content, answerType, onRetry, isStreaming, news, style }: MessageBubbleProps) {
   const isUser = role === 'user';
   const [copied, setCopied] = useState(false);
 
@@ -105,7 +109,11 @@ export function MessageBubble({ role, content, answerType, onRetry, style }: Mes
       {isUser ? (
         <Text style={styles.userContent}>{content}</Text>
       ) : (
-        <Markdown style={markdownStyles}>{content}</Markdown>
+        <View>
+          <Markdown style={markdownStyles}>{content}</Markdown>
+          {news && news.length > 0 && <NewsCard news={news} />}
+          {isStreaming && <Text style={styles.cursor}>|</Text>}
+        </View>
       )}
       {!isUser && onRetry && (
         <Pressable onPress={onRetry} style={styles.retryButton}>
@@ -175,5 +183,10 @@ const styles = StyleSheet.create({
     ...typography.helper,
     color: colors.danger,
     fontWeight: '600',
+  },
+  cursor: {
+    ...typography.body,
+    color: colors.textMuted,
+    opacity: 0.7,
   },
 });
