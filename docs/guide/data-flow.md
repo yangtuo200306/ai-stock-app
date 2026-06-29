@@ -92,9 +92,136 @@ c. 自动触发 recordsStore.fetchRecords() 刷新记录列表
 
 ---
 
-## 2. 自选股流程
+## 2. Agent 模式数据流（v1.9.4+）
 
-### 2.1 加载自选列表
+Agent 模式是 v1.9.4 新增的问股路径，LLM 通过 Function Calling 自主决定调哪些工具，而不是由后端预先取好所有数据。
+
+### 2.1 整体流程
+
+```
+用户输入 "600519 怎么样？"
+        │
+        ▼
+┌──────────────────────────────────────────┐
+│  AskScreen.tsx                            │
+│  1. 用户输入问题，点击发送                 │
+│  2. 右上角切换 Agent/标准模式              │
+│  3. Agent 模式 → askStore.handleAskAgentStream()
+│  4. askStore 调用 apiPostAgentStream()     │
+│  5. api/client.ts 解析 SSE 多类型事件      │
+└──────────────────┬───────────────────────┘
+                   │ POST /api/ask/agent/stream
+                   ▼
+┌──────────────────────────────────────────┐
+│  ask.py — ask_agent_stream()             │
+│  1. 解析 session（多轮对话支持）           │
+│  2. 解析股票代码（不再强制校验）            │
+│  3. 构建原则式 system prompt               │
+│  4. 注入多轮对话 context（stock/上一轮问题）│
+│  5. 调用 run_agent_loop() 启动 Agent 循环  │
+│  6. finally 块保存会话/消息/记录（含thinking_json）│
+└──────────────────┬───────────────────────┘
+                   │ Generator[yield SSE events]
+                   ▼
+┌──────────────────────────────────────────┐
+│  agent_loop.py — run_agent_loop()        │
+│  ReAct 循环（最多 5 步）：                 │
+│                                           │
+│  1. yield thinking 事件                    │
+│  2. 调用 LLM（带 tool definitions）        │
+│  3. LLM 返回 tool_calls → 执行工具         │
+│     ├─ tool_start 事件（前端显示）          │
+│     ├─ 执行 handler（调用现有 Service）     │
+│     └─ tool_done 事件（含耗时）             │
+│  4. 工具结果回填到 messages                 │
+│  5. 继续下一轮循环                          │
+│  6. LLM 返回文本 → yield text 事件（逐chunk）│
+│  7. yield done 事件                        │
+└──────────────────┬───────────────────────┘
+                   │
+                   ▼
+┌──────────────────────────────────────────┐
+│  tool_registry.py + tool_factory.py      │
+│                                           │
+│  7 个已注册工具：                          │
+│  ├─ search_stock → stock_resolver.py       │
+│  ├─ get_stock_quote → market_data.py       │
+│  ├─ get_technical_indicators               │
+│  │     → technical_indicators.py           │
+│  ├─ get_stock_news → news_fetcher.py       │
+│  ├─ get_analysis_report                   │
+│  │     → report_builder.py                │
+│  ├─ get_market_indices                    │
+│  │     → market_overview.py (v2.0.1)       │
+│  └─ get_sector_rankings                   │
+│        → market_overview.py (v2.0.1)       │
+└──────────────────────────────────────────┘
+```
+
+### 2.2 SSE 事件协议
+
+Agent 循环是多步的，不能等全部完成再返回。用 SSE 逐条推送事件：
+
+```
+data: {"type":"thinking","message":"AI 正在分析..."}
+data: {"type":"tool_start","tool":"get_stock_quote","display_name":"获取实时行情"}
+data: {"type":"tool_done","tool":"get_stock_quote","success":true,"duration":0.5}
+data: {"type":"text","content":"根据最新数据..."}
+data: {"type":"done","success":true,"session_id":"xxx","full_answer":"..."}
+```
+
+| 事件类型 | 触发时机 | 关键字段 |
+|---------|---------|---------|
+| `thinking` | Agent 循环开始时 | `message` |
+| `tool_start` | 每个工具执行前 | `tool`, `display_name` |
+| `tool_done` | 每个工具执行后 | `tool`, `success`, `duration` |
+| `text` | LLM 生成最终答案时（逐 chunk） | `content` |
+| `done` | Agent 循环结束 | `success`, `session_id`, `full_answer` |
+
+事件流结束后，后端将 thinking/tool_start/tool_done 事件序列化为 JSON 存入 `ask_messages.thinking_json` 列，前端恢复会话时可解析并展示历史思考过程。
+
+### 2.3 前端事件处理
+
+```
+apiPostAgentStream() 解析 SSE 流
+        │
+        ▼
+askStore.handleAskAgentStream()
+  ├── thinking → 追加 ThinkingStep{type:'thinking'}
+  ├── tool_start → 追加 ThinkingStep{type:'tool_start'}
+  ├── tool_done → 更新上一个 tool_start 为 tool_done
+  ├── text → 累积到 accumulatedContent，更新 messages 末尾
+  └── done
+      ├── success: false → shouldFallback=true → 降级到传统流式
+      └── success: true → 更新 sessionId，刷新自选/记录
+```
+
+### 2.4 标准模式 vs Agent 模式对比
+
+| 维度 | 标准模式 | Agent 模式 |
+|------|---------|-----------|
+| 数据获取 | 后端预先全部取好 | LLM 按需调工具 |
+| API 端点 | `POST /api/ask/stream` | `POST /api/ask/agent/stream` |
+| 返回格式 | SSE 单类型（纯文本） | SSE 多类型（thinking/tool_start/tool_done/text/done） |
+| 结果卡片 | ✅ 有（结构化数据） | ❌ 无（纯对话） |
+| 新闻展示 | NewsCard 组件 | LLM 输出 Markdown 链接 |
+| 思考过程 | 无 | 可折叠面板（工具数 + 总耗时） |
+| 降级路径 | 传统流式 → 规则回答 | Agent 失败 → 传统流式 → 规则回答 |
+
+### 2.5 三层降级保护
+
+```
+Agent 模式
+  ├── HTTP 非 200 → 传统流式
+  ├── done: success: false → 传统流式
+  └── 传统流式失败 → 非流式 LLM → 规则回答
+```
+
+---
+
+## 3. 自选股流程
+
+### 3.1 加载自选列表
 
 ```
 WatchlistScreen 加载
@@ -113,7 +240,7 @@ apiGet('/api/stocks')  ───→  stocks.py (GET /api/stocks)
                               返回 Stock[]（含 price, change_pct, latest_summary）
 ```
 
-### 2.2 添加自选股
+### 3.2 添加自选股
 
 ```
 AskScreen "加入自选" 按钮
@@ -133,7 +260,7 @@ stocks.py (POST /api/stocks)
 askStore 调用 watchlistStore.loadStocks() 刷新
 ```
 
-### 2.3 删除自选股
+### 3.3 删除自选股
 
 ```
 WatchlistScreen 点击删除 → ConfirmDialog 确认
@@ -153,7 +280,7 @@ stocks.py (DELETE /api/stocks/{code})
 
 ---
 
-## 3. 分析任务流程
+## 4. 分析任务流程
 
 ```
 WatchlistScreen 点击"分析"按钮
@@ -185,9 +312,9 @@ watchlistStore 保存 task_id → AsyncStorage
 
 ---
 
-## 4. 认证流程
+## 5. 认证流程
 
-### 4.1 注册/登录
+### 5.1 注册/登录
 
 ```
 LoginScreen
@@ -226,7 +353,7 @@ database.py get_current_user_id()
   └── 存在 → 返回 user_id（注入到 API 路由函数）
 ```
 
-### 4.3 Token 失效处理
+### 5.3 Token 失效处理
 
 ```
 API 返回 401
@@ -247,9 +374,9 @@ api/client.ts handleResponse()
 
 ---
 
-## 5. 记录流程
+## 6. 记录流程
 
-### 5.1 记录列表
+### 6.1 记录列表
 
 ```
 RecordListScreen 加载
@@ -267,7 +394,7 @@ records.py (GET /api/records)
   → 返回 RecordItem[]
 ```
 
-### 5.2 记录详情
+### 6.2 记录详情
 
 ```
 RecordListScreen 点击某条记录
@@ -285,7 +412,7 @@ records.py (GET /api/records/{id})
   → 返回 RecordDetail（含 messages[]）
 ```
 
-### 5.3 记录类型说明
+### 6.3 记录类型说明
 
 | record_type | 来源 | 说明 |
 |-------------|------|------|
@@ -294,7 +421,7 @@ records.py (GET /api/records/{id})
 
 ---
 
-## 6. 行情数据流
+## 7. 行情数据流
 
 ```
 get_stock_quote(code)
@@ -325,7 +452,7 @@ get_stock_history(code, days=30)
 
 ---
 
-## 7. 前端数据流总览
+## 8. 前端数据流总览
 
 ```
                     ┌─────────────────────────┐

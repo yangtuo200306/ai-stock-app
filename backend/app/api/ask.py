@@ -365,21 +365,19 @@ def ask_agent_stream(
     if ask.session_id:
         session = _get_ask_session(ask.session_id, user_id)
 
-    # --- resolve stock code ---
+    # --- resolve stock code (不再强制校验，让 LLM 自行通过 search_stock 搜索) ---
     stock_code = None
+    stock_name = None
     if session:
         stock_code = session["stock_code"]
+        stock_name = session["stock_name"]
     elif ask.stock_code:
         stock_code = ask.stock_code.strip()
     elif ask.question:
         extracted = _extract_stock_code(ask.question)
-        if not extracted:
-            supported = "、".join(get_supported_names())
-            raise api_error(400, ErrorCode.STOCK_NOT_FOUND,
-                             f"问题中未找到 6 位股票代码或已支持的股票名称（当前支持：{supported}），请提供例如：600519 怎么看？")
-        stock_code = extracted
-    else:
-        raise api_error(400, ErrorCode.MISSING_STOCK_CODE, "请提供股票代码或包含股票代码的问题")
+        if extracted:
+            stock_code = extracted
+    # stock_code 为 None 时由 LLM 自行处理
 
     # --- build conversation messages ---
     conversation_messages = None
@@ -395,48 +393,57 @@ def ask_agent_stream(
         stock_name = session["stock_name"]
         _write_ask_message(session_id, user_id, "user", ask.question or "")
     else:
-        # 先获取股票名称用于创建会话
-        from app.services.market_data import get_stock_quote
-        try:
-            quote = get_stock_quote(stock_code)
-            stock_name = quote.name
-        except Exception:
-            stock_name = stock_code
-        title = _build_conversation_title(stock_name, stock_code)
+        # 未指定股票时创建通用会话
+        if stock_code:
+            from app.services.market_data import get_stock_quote
+            try:
+                quote = get_stock_quote(stock_code)
+                stock_name = quote.name
+            except Exception:
+                stock_name = stock_code
+        else:
+            stock_name = "通用"
+        title = ask.question[:20] if ask.question and not stock_code else _build_conversation_title(stock_name or "通用", stock_code or "未知")
         session_id = _create_ask_session(
-            user_id, stock_code, stock_name, title, "",
+            user_id, stock_code or "", stock_name or "通用", title, "",
             ask.question or "", "", "ai", "ok", model_name,
         )
         _write_ask_message(session_id, user_id, "user", ask.question or "")
         is_new_session = True
 
-    # --- build system prompt ---
+    # --- build system prompt (原则式，LLM 自主决定回答结构) ---
     system_prompt = (
-        "你是专业的股票分析助手，擅长用通俗易懂的语言向个人投资者解释股票走势。\n"
-        "你的分析风格：客观、简洁、有依据。\n"
-        "你输出的每个结论都必须基于通过工具获取的真实数据，不猜测、不编造。\n"
-        f"股票代码 {stock_code}（{stock_name}）已确认，无需调用 search_stock 搜索。\n"
-        "你可以使用以下工具来获取所需数据：\n"
+        "你是专业的股票分析助手，面向个人投资者。\n"
+        "你的原则：\n"
+        "  1. 所有结论必须基于通过工具获取的真实数据，不猜测、不编造。\n"
+        "  2. 引用新闻时使用 Markdown 链接格式：[标题](url)，方便用户点击查看。\n"
+        "  3. 如果用户未明确指定股票代码或名称，先调用 search_stock 搜索。\n"
+        "  4. 搜索不到则基于已有知识回答或请用户补充说明。\n"
+        "  5. 回答末尾必须包含：仅供学习参考，不构成投资建议。\n"
+        "你可以使用以下工具：\n"
+        "  - search_stock：搜索股票代码或名称\n"
         "  - get_stock_quote：获取实时行情\n"
         "  - get_technical_indicators：获取技术指标\n"
         "  - get_stock_news：获取相关新闻\n"
         "  - get_analysis_report：获取综合分析报告\n"
-        "根据用户问题，自主决定需要调用哪些工具。\n"
-        "请按以下结构回答：\n"
-        "【结论】一句话直接回答用户问题\n"
-        "【关键数据】列出最重要的 3-4 个数据点\n"
-        "【详细分析】展开说明\n"
-        "【风险提示】列出主要风险点\n"
-        "引用新闻时请使用 Markdown 链接格式：[标题](url)，方便用户点击查看原文。\n"
-        "回答末尾必须包含：仅供学习参考，不构成投资建议。"
+        "根据用户问题，自主决定调用哪些工具以及如何组织回答。"
     )
 
-    # --- build user messages ---
+    # --- build user messages (含多轮对话上下文) ---
     user_messages = []
+    if session:
+        # 注入上一轮的股票上下文
+        context_parts = [f"当前对话围绕 {session['stock_name']}（{session['stock_code']}）。"]
+        if session.get("last_question"):
+            context_parts.append(f"上一轮用户问题：{session['last_question']}")
+        user_messages.append({
+            "role": "system",
+            "content": " ".join(context_parts),
+        })
     if conversation_messages:
         for msg in conversation_messages:
             user_messages.append({"role": msg["role"], "content": msg["content"]})
-    user_messages.append({"role": "user", "content": ask.question or f"{stock_code} 怎么样？"})
+    user_messages.append({"role": "user", "content": ask.question or ""})
 
     # --- build minimal report for record saving ---
     def _build_minimal_report(code: str) -> dict:
@@ -478,6 +485,7 @@ def ask_agent_stream(
     # --- run agent loop ---
     def _stream_agent():
         full_answer = ""
+        thinking_steps = []  # 收集 thinking 事件
         try:
             for sse_event in run_agent_loop(
                 system_prompt=system_prompt,
@@ -485,13 +493,16 @@ def ask_agent_stream(
                 session_id=session_id,
             ):
                 yield sse_event
-                # 解析 JSON 事件，从 text 事件中累积完整文本
+                # 解析 JSON 事件
                 try:
                     data_str = sse_event
                     if data_str.startswith("data: "):
                         data_str = data_str[6:]
                     evt = json.loads(data_str.strip())
-                    if evt.get("type") == "text" and evt.get("content"):
+                    evt_type = evt.get("type")
+                    if evt_type in ("thinking", "tool_start", "tool_done"):
+                        thinking_steps.append(evt)
+                    elif evt_type == "text" and evt.get("content"):
                         full_answer += evt["content"]
                 except Exception:
                     pass
@@ -501,32 +512,40 @@ def ask_agent_stream(
                         len(full_answer), session_id, session is not None)
             if full_answer:
                 try:
+                    thinking_json = json.dumps(thinking_steps, ensure_ascii=False) if thinking_steps else None
                     summary = full_answer[:80] if len(full_answer) > 80 else full_answer
                     final_answer_type = "ai"
                     final_ai_status = "ok"
-                    logger.info("[DEBUG] 开始构建 minimal_report")
-                    minimal_report = _build_minimal_report(stock_code)
-                    logger.info("[DEBUG] minimal_report 构建完成: score=%s", minimal_report.get("score"))
+                    if stock_code:
+                        logger.info("[DEBUG] 开始构建 minimal_report")
+                        minimal_report = _build_minimal_report(stock_code)
+                        logger.info("[DEBUG] minimal_report 构建完成: score=%s", minimal_report.get("score"))
+                    else:
+                        minimal_report = None
                     if session:
                         logger.info("[DEBUG] 更新已有会话: session=%s", session_id)
                         _update_ask_session(session_id, ask.question or "", full_answer, summary,
                                             final_answer_type, final_ai_status, model_name)
                         _write_ask_message(session_id, user_id, "assistant", full_answer,
-                                           answer_type=final_answer_type, ai_status=final_ai_status, model=model_name)
-                        _write_or_update_ask_record(
-                            minimal_report, ask.question or "", full_answer, final_answer_type, final_ai_status,
-                            model_name, user_id, session_id, is_new=False,
-                        )
+                                           answer_type=final_answer_type, ai_status=final_ai_status,
+                                           model=model_name, thinking_json=thinking_json)
+                        if minimal_report:
+                            _write_or_update_ask_record(
+                                minimal_report, ask.question or "", full_answer, final_answer_type, final_ai_status,
+                                model_name, user_id, session_id, is_new=False,
+                            )
                     else:
                         logger.info("[DEBUG] 创建新会话: stock=%s", stock_code)
                         _update_ask_session(session_id, ask.question or "", full_answer, summary,
                                             final_answer_type, final_ai_status, model_name)
                         _write_ask_message(session_id, user_id, "assistant", full_answer,
-                                           answer_type=final_answer_type, ai_status=final_ai_status, model=model_name)
-                        _write_or_update_ask_record(
-                            minimal_report, ask.question or "", full_answer, final_answer_type, final_ai_status,
-                            model_name, user_id, session_id, is_new=True,
-                        )
+                                           answer_type=final_answer_type, ai_status=final_ai_status,
+                                           model=model_name, thinking_json=thinking_json)
+                        if minimal_report:
+                            _write_or_update_ask_record(
+                                minimal_report, ask.question or "", full_answer, final_answer_type, final_ai_status,
+                                model_name, user_id, session_id, is_new=True,
+                            )
                     logger.info("[DEBUG] Agent 记录保存成功")
                 except Exception as e:
                     logger.error("[DEBUG] 保存 Agent 会话记录失败: %s", e, exc_info=True)

@@ -54,7 +54,13 @@ backend/
         ├── report_builder.py      # 报告构建：组装分析报告（评分、趋势、建议、风险、摘要）
         ├── llm_client.py          # LLM 客户端：调用火山方舟大模型，含 Prompt 构建
         ├── ask_service.py         # 问股服务：会话管理、消息写入、记录写入、规则回答生成
-        └── stock_resolver.py      # 股票代码解析：从自然语言中提取股票代码/名称
+        ├── stock_resolver.py      # 股票代码解析：从自然语言中提取股票代码/名称
+        ├── tool_registry.py       # 工具注册表（v1.9.4+）：ToolDefinition + ToolRegistry，管理工具定义和 handler
+        ├── tool_factory.py        # 工具工厂（v1.9.4+）：注册 7 个工具 handler，创建 ToolRegistry 实例
+        ├── agent_loop.py          # Agent 执行循环（v1.9.4+）：ReAct 循环引擎，逐条 yield SSE 事件
+        ├── news_fetcher.py        # 新闻获取（v1.9.3+）：akshare 东方财富 + 搜狗双源
+        ├── market_overview.py      # 大盘行情 + 板块排行（v2.0.1+）：akshare 指数 + 行业板块数据
+        └── indicators_schema.py   # 技术指标 Pydantic 模型（v1.8+）
 ```
 
 ### 后端 API 接口一览
@@ -72,7 +78,11 @@ backend/
 | GET | `/api/stocks/search?q=` | 否 | 股票搜索自动补全 |
 | POST | `/api/analysis` | 是 | 创建分析任务 |
 | GET | `/api/analysis/{task_id}` | 是 | 查询任务状态 |
+| GET | `/api/sessions` | 是 | 最近会话列表（v2.0.1+） |
+| GET | `/api/ask/messages?session_id=` | 是 | 获取会话消息列表（v2.0.1+） |
 | POST | `/api/ask` | 是 | 问股（支持新会话和追问） |
+| POST | `/api/ask/stream` | 是 | 问股流式端点（SSE 逐 chunk 输出） |
+| POST | `/api/ask/agent/stream` | 是 | Agent 模式问股（v1.9.4+，Function Calling + SSE 多类型事件） |
 | GET | `/api/market/quote/{code}` | 否 | 查询实时行情 |
 | GET | `/api/records` | 是 | 记录列表 |
 | GET | `/api/records/{id}` | 是 | 记录详情（含对话消息） |
@@ -91,7 +101,7 @@ backend/
 | `reports` | 分析报告 | stock_code, stock_name, price, score, risks_json, indicators_json, user_id |
 | `records` | 统一记录（问股+报告） | record_type, stock_code, session_id, metadata_json, user_id |
 | `ask_sessions` | 问股会话 | session_id, stock_code, user_id, title, summary |
-| `ask_messages` | 问股消息 | session_id, role, content, answer_type, ai_status, model |
+| `ask_messages` | 问股消息 | session_id, role, content, answer_type, ai_status, model, thinking_json |
 | `schema_version` | 数据库迁移版本 | version, description, applied_at |
 
 ---
@@ -201,7 +211,7 @@ AppNavigator (Bottom Tab)
 |-------|------|------|
 | `watchlistStore` | stocks, taskStatuses, isLoading, loadError, searchQuery | loadStocks, addStock, deleteStock, createAnalysis, loadTaskStatuses |
 | `recordsStore` | items, isLoading, loadError, searchQuery | fetchRecords, deleteRecord |
-| `askStore` | sessionId, messages, question, isLoading, error, latestResult | handleAsk, handleNewSession, handleAddToWatchlist, restoreSession |
+| `askStore` | sessionId, messages, question, isLoading, error, latestResult, thinkingSteps | handleAsk, handleAskStream, handleAskAgentStream, handleNewSession, handleAddToWatchlist, restoreSession |
 
 ---
 

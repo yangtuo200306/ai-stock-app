@@ -355,3 +355,188 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir 
 | 10 | 5 轮 | 比较充裕 |
 
 **工具结果不持久化：** 工具调用结果只存在于当前 Agent 循环中（内存），不会存到数据库。下一轮对话需要重新调工具获取。这对股票分析是合理的——数据时效性强，重新获取是正确的行为。
+
+---
+
+## v1.9.5 学习要点
+
+### 25. 原则式 Prompt vs 模板式 Prompt
+
+| | 模板式 | 原则式 |
+|--|--------|--------|
+| 适用场景 | 确定性输出（标准模式） | 非确定性编排（Agent 模式） |
+| 控制粒度 | 告诉 LLM"怎么做" | 告诉 LLM"不能做什么" |
+| 灵活性 | 低，结构固定 | 高，自主决定 |
+| 示例 | "请按【结论】【关键数据】结构回答" | "所有结论必须基于真实数据，不编造" |
+
+**关键理解：** Agent 模式的本质是 LLM 自主决定调哪些工具、按什么顺序、输出什么结构。模板式 prompt 限制了这种灵活性。原则式 prompt 的核心思想是：告诉 LLM 边界（不能编造、必须引用来源），让 LLM 在边界内自由发挥。
+
+### 26. API 层校验 vs LLM 自主处理
+
+传统 API 设计是"防御性"的——在入口处校验参数，不符合就拒绝。但在 Agent 模式下，LLM 本身就是一个"智能参数解析器"。把校验前置到 API 层，反而剥夺了 LLM 的灵活性。
+
+**设计原则：** Agent 模式下，LLM 是第一道防线，API 层只做路由和会话管理。标准模式保留校验，因为标准模式需要预取行情数据，必须提前知道股票代码。
+
+### 27. 多轮对话的 Context 注入策略
+
+注入一个 `system` 角色的上下文块，包含上一轮的关键信息：
+
+```python
+user_messages.append({
+    "role": "system",
+    "content": f"当前对话围绕 {stock_name}（{stock_code}）。上一轮用户问题：{last_question}"
+})
+```
+
+**为什么用 system 角色？** system 角色的消息在 LLM 的注意力机制中优先级更高，不会被历史对话"淹没"。这个 context 块就像给 LLM 的一个"会议纪要摘要"。
+
+**为什么不注入 last_answer？** LLM 已经能看到历史消息里的完整对话，不需要重复。注入的是历史消息里不直接包含的信息——比如 session 的 stock_code 和 stock_name。
+
+### 28. 思考过程持久化的存储策略
+
+**为什么用 JSON 文本列而不是单独建表？**
+
+| 方案 | 优点 | 缺点 |
+|------|------|------|
+| 单独建表 | 规范化，可按类型查询 | 查询复杂度高 |
+| JSON 文本列 | 写入简单，读取一次解析 | 不能按字段查询 |
+
+思考过程的特点是"写入一次，读取展示"，不需要按字段查询，所以 JSON 列是最优选择。
+
+**迁移策略：** `ensure_column` + `ALTER TABLE ADD COLUMN` 是零风险的——新列可空，旧数据该字段为 NULL，前端解析时 catch 异常跳过。
+
+### 29. 降级路径的兼容性陷阱
+
+Agent 模式降级到标准模式时，如果用户没提供 stock_code，标准模式仍然会报 400。因为降级走的是标准模式的代码路径，它依赖预解析的 stock_code。
+
+**修复：** 在降级前判断是否有 stock_code，有则降级，无则直接显示错误提示。
+
+```typescript
+if (shouldFallback) {
+    if (stockCode) {
+        // 有股票代码时降级到传统流式
+        get().handleAskStream(stockCode);
+    } else {
+        // 无股票代码时标准模式也无法处理，直接报错
+        set({ error: 'Agent 分析失败，请重试或提供股票代码' });
+    }
+}
+```
+
+---
+
+## v1.9 系列跨版本经验
+
+### 30. SSE 事件流的三次迭代
+
+```
+v1.9.2: 标准流式 → 单类型 text 事件，逐 chunk
+v1.9.4: Agent 流式 → 多类型事件（thinking/tool_start/tool_done/text/done）
+v1.9.5: 思考持久化 → 事件流结束后序列化存库，恢复时反序列化
+```
+
+**经验：** SSE 基础设施一次搭建，后续只扩展事件类型和存储策略，不需要动传输层。前期的协议设计（`type` + `data` JSON）为后续扩展留了空间。
+
+### 31. 降级策略的层层叠加
+
+```
+v1.9.2: 流式失败 → 非流式兜底（1 层）
+v1.9.4: Agent 失败 → 流式 → 非流式（3 层）
+v1.9.5: 发现降级到流式时无 stock_code 仍会报 400
+```
+
+**经验：** 降级路径本身也需要测试。每加一层降级，就要检查所有降级入口的**前置条件**是否满足。v1.9.5 的 bug 就是降级前没检查 stock_code 是否存在。
+
+### 32. 增量式架构叠加策略
+
+整个 v1.9 系列没有重构一行现有代码，全是叠加：
+
+| 版本 | 叠加了什么 | 动现有代码？ |
+|------|-----------|------------|
+| v1.9.1 | 改 system prompt 字符串 | 否 |
+| v1.9.2 | 新增 SSE 端点 | 否 |
+| v1.9.3 | 新增 news_fetcher 模块 | 否 |
+| v1.9.4 | 新增 tool_registry + agent_loop | 否 |
+| v1.9.5 | 改 Agent 端点的 prompt + 逻辑 | 否（只改 Agent 专属路径） |
+
+**经验：** "加新东西不动旧东西"的策略在 v1.9 被验证是有效的。代价是代码量增加（新增 5 个文件），但风险极低——每个版本都可以独立测试，旧功能不受影响。
+
+### 33. 竞态条件：回调地狱
+
+```typescript
+// 问题：done 事件回调里直接调降级
+eventSource.onmessage = (event) => {
+    if (type === 'done' && !success) {
+        handleAskStream(stockCode);  // 和 onDone 回调形成竞态
+    }
+};
+```
+
+**修复：** 用 `shouldFallback` 标记延迟到 `onDone` 再执行，避免两个回调同时操作 store。
+
+**经验：** SSE 的回调 + React store 的 setState 是异步的，两个回调同时调 store 方法会导致竞态。标记 + 延迟执行是简单的解决方案。
+
+### 34. JSON 字符串匹配不可靠
+
+```python
+# 错误：手写 JSON 字符串匹配
+if '"type":"text"' in chunk:  # 永远匹配不上
+
+# 正确：用 json.loads 解析
+data = json.loads(chunk)
+if data['type'] == 'text':
+```
+
+**经验：** `json.dumps` 输出 `"type": "text"`（冒号后有空格），手写条件 `'"type":"text"'`（无空格）永远匹配不上。任何 JSON 操作都必须用解析器，不要手写字符串匹配。
+
+### 35. 数据链路透传检查
+
+新增 `turnover_rate` 和 `amplitude` 字段时，`market_data.py` 提取了、`technical_indicators.py` 返回了，但 `report_builder.py` 自己拼了 `indicators` dict 漏了这两个字段。
+
+**经验：** 数据链路每增加一个字段，要检查链路上的每个环节是否都透传了。`docs/guide/data-flow.md` 的链路图就是干这个用的。
+
+---
+
+## v2.0.1 学习要点
+
+### 36. 工具描述中的触发条件
+
+工具描述不仅要说明"这个工具返回什么"，还要说明"什么时候调它"：
+
+```python
+# 好
+description="获取行业板块涨跌排行。当用户询问哪些板块涨得好、板块轮动情况时调用。"
+
+# 不好
+description="获取行业板块涨跌排行。"
+```
+
+LLM 判断调哪个工具时，描述是唯一依据。包含触发条件的描述能让 LLM 更准确地选择工具。
+
+### 37. 无参数工具降低 LLM 调用门槛
+
+`get_market_indices` 没有参数，LLM 直接调就行。对比 `get_stock_quote` 需要传 `stock_code`，LLM 必须先知道股票代码才能调。
+
+**原则：** 工具的参数越少，LLM 调用成功率越高。对于"大盘行情"这种确定性的数据，不需要参数是最好的设计。
+
+### 38. Drawer 导航嵌入 Tab 导航
+
+React Navigation 的 Drawer 和 Tab 可以嵌套使用：
+
+```
+Tab Navigator
+  ├─ 自选 tab → Stack Navigator
+  ├─ 问股 tab → Drawer Navigator  ← 新增
+  │              ├─ 主内容区: AskScreen
+  │              └─ 抽屉: SessionDrawer
+  ├─ 记录 tab → Stack Navigator
+  └─ 我的 tab → Stack Navigator
+```
+
+**关键点：** `drawerType: 'front'` 让抽屉覆盖在内容上面，不影响 Tab 布局。`drawerStyle: { width: 280 }` 适配手机屏幕。
+
+### 39. 数据源选择：akshare 的一库多用
+
+akshare 不只是新闻源，它同时提供指数行情、板块排行、基本面数据。一个库解决多个数据需求，不需要额外依赖。
+
+**模式：** 每个数据源封装成独立的 service 文件（`market_overview.py`、`news_fetcher.py`），内部管理缓存和错误处理，对外暴露统一的函数接口。

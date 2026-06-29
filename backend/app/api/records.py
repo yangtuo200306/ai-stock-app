@@ -93,7 +93,7 @@ def get_record(record_id: int, user_id: str = Depends(get_current_user_id)):
         with get_connection() as connection:
             msg_rows = connection.execute(
                 """
-                SELECT id, role, content, answer_type, ai_status, model, created_at
+                SELECT id, role, content, answer_type, ai_status, model, thinking_json, created_at
                 FROM ask_messages
                 WHERE session_id = ? AND user_id = ?
                 ORDER BY id ASC

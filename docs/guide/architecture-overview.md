@@ -97,14 +97,14 @@ App.tsx (根组件)
 ┌─────────────────────────────────────────────┐
 │              Zustand Stores                  │
 │                                              │
-│  watchlistStore     recordsStore   askStore  │
-│  ┌─────────────┐   ┌──────────┐   ┌───────┐ │
-│  │ stocks[]    │   │ items[]  │   │messages│ │
-│  │ taskStatuses│   │ isLoading│   │session │ │
-│  │ isLoading   │   │ loadError│   │question│ │
-│  │ loadError   │   │ searchQ  │   │error   │ │
-│  │ searchQuery │   └──────────┘   │result  │ │
-│  └─────────────┘                  └───────┘ │
+│  watchlistStore     recordsStore   askStore   sessionStore │
+│  ┌─────────────┐   ┌──────────┐   ┌───────┐  ┌──────────┐│
+│  │ stocks[]    │   │ items[]  │   │messages│  │sessions[]││
+│  │ taskStatuses│   │ isLoading│   │session │  │isLoading ││
+│  │ isLoading   │   │ loadError│   │question│  └──────────┘│
+│  │ loadError   │   │ searchQ  │   │error   │              │
+│  │ searchQuery │   └──────────┘   │result  │              │
+│  └─────────────┘                  └───────┘              │
 │                                              │
 │  每个 Store 职责单一，组件按需订阅              │
 │  Store 间通过 getState() 互相调用              │
@@ -242,7 +242,102 @@ Settings 类
 | app.log | INFO | 同上，10MB 轮转，保留 5 份 | 常规运行日志 |
 | app_debug.log | DEBUG | 同上，50MB 轮转，保留 3 份 | 详细排查 |
 
-### 3.5 数据库架构
+### 3.5 Agent 架构（v1.9.4+）
+
+v1.9.4 新增 Agent 模式，在现有架构上叠加了一层"LLM 自主调工具"的能力，不动现有路径。
+
+#### 3.5.1 核心组件
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ask.py — ask_agent_stream()                            │
+│  职责：Agent 模式 API 端点                               │
+│  - 解析 session / 股票代码                               │
+│  - 构建 system prompt（结构化格式要求）                   │
+│  - 启动 Agent 循环                                       │
+│  - finally 块保存会话/消息/记录                           │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│  agent_loop.py — run_agent_loop()                       │
+│  职责：ReAct 循环引擎                                    │
+│  - 管理 LLM 调用 + 工具执行的循环                         │
+│  - 逐条 yield SSE 事件（thinking/tool_start/tool_done/  │
+│    text/done）                                           │
+│  - 保护机制：max_steps=5, step_timeout=30s,             │
+│    overall_timeout=120s                                  │
+│  - 全局缓存 ToolRegistry（跨请求共享）                    │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+          ┌────────────┴────────────┐
+          ▼                         ▼
+┌──────────────────┐   ┌──────────────────────────┐
+│ tool_registry.py │   │ tool_factory.py           │
+│ 工具注册表        │   │ 工具工厂                  │
+│ - 注册/查询/执行  │   │ - 注册 4 个 handler       │
+│ - OpenAI 格式转换 │   │ - 每个 handler 调用       │
+│ - 显示名称映射    │   │   现有 Service            │
+└──────────────────┘   └──────────────────────────┘
+```
+
+#### 3.5.2 Tool Registry 模式
+
+```python
+class ToolRegistry:
+    _tools: dict[str, ToolDefinition]
+
+    def register(self, tool): ...      # 注册工具
+    def get_openai_tools(self): ...    # 转 OpenAI 格式
+    def execute(self, name, **kwargs): # 执行工具
+```
+
+**好处：** 加新能力 = 注册一个新 tool，零管线改动。
+
+#### 3.5.3 已注册工具
+
+| 工具名 | 功能 | 调用 Service |
+|--------|------|-------------|
+| `search_stock` | 搜索股票代码或名称 | `stock_resolver.resolve_stock_input()` |
+| `get_stock_quote` | 获取个股实时行情 | `market_data.get_stock_quote()` |
+| `get_technical_indicators` | 获取技术指标 | `technical_indicators.build_technical_indicators()` |
+| `get_stock_news` | 获取个股相关新闻 | `news_fetcher.fetch_news()` |
+| `get_analysis_report` | 获取综合分析报告 | `report_builder.build_analysis_report()` |
+
+`search_stock` 在 v1.9.4 中被排除（API 层预解析），v1.9.5 加回，让 LLM 自主搜索。
+
+#### 3.5.4 SSE 事件协议
+
+Agent 循环是多步的，用 SSE 逐条推送事件：
+
+| 事件类型 | 触发时机 | 关键字段 |
+|---------|---------|---------|
+| `thinking` | 循环开始时 | `message` |
+| `tool_start` | 每个工具执行前 | `tool`, `display_name` |
+| `tool_done` | 每个工具执行后 | `tool`, `success`, `duration` |
+| `text` | LLM 生成最终答案时（逐 chunk） | `content` |
+| `done` | 循环结束 | `success`, `session_id`, `full_answer` |
+
+#### 3.5.5 降级保护
+
+```
+Agent 失败（HTTP 非 200）→ 传统流式
+Agent 成功但内部 LLM 失败（done: success: false）→ 传统流式
+传统流式失败 → 非流式 LLM → 规则回答
+```
+
+#### 3.5.6 标准模式 vs Agent 模式
+
+| 维度 | 标准模式 | Agent 模式 |
+|------|---------|-----------|
+| 数据获取 | 后端预先全部取好 | LLM 按需调工具 |
+| API 端点 | `POST /api/ask/stream` | `POST /api/ask/agent/stream` |
+| 返回格式 | SSE 单类型（纯文本） | SSE 多类型 |
+| 结果卡片 | ✅ 有 | ❌ 无（纯对话） |
+| 新闻展示 | NewsCard 组件 | LLM 输出 Markdown 链接 |
+| 思考过程 | 无 | 可折叠面板 |
+
+### 3.6 数据库架构
 
 #### 表关系图
 
@@ -266,11 +361,13 @@ records (N) ──── (1) reports            (记录关联报告，通过 rep
 
 - `schema_version` 表记录已应用的迁移版本
 - 启动时 `init_db()` 自动检查并执行未应用的迁移
-- 当前版本：`V20260625_003_ensure_columns`
+- 当前版本：`V20260629_001_add_thinking_json`
 - 迁移历史：
   1. `V20260625_001_initial_baseline` — 初始建表
   2. `V20260625_002_migrate_stocks_unique` — stocks 表唯一约束从 `code` 改为 `(user_id, code)`
   3. `V20260625_003_ensure_columns` — 补充缺失列（report_id, user_id, session_id, updated_at）
+  4. `V20260625_004_add_news_json` — reports 表新增 news_json 列
+  5. `V20260629_001_add_thinking_json` — ask_messages 表新增 thinking_json 列
 
 ---
 

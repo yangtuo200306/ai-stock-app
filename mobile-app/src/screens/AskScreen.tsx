@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import type { RootTabParamList } from '../types';
+import type { DrawerNavigationProp } from '@react-navigation/drawer';
+import type { RootTabParamList, ThinkingStep } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useAskStore } from '../stores/askStore';
 import { AppButton } from '../components/AppButton';
@@ -22,6 +23,7 @@ import { formatChangePct, getChangeColor } from '../utils/stockDisplay';
 
 type AskRouteProp = RouteProp<RootTabParamList, '问股'>;
 type AskTabNavProp = BottomTabNavigationProp<RootTabParamList>;
+type AskDrawerNavProp = DrawerNavigationProp<Record<string, undefined>>;
 
 const QUICK_QUESTIONS = [
   { label: '分析 600519', question: '600519 怎么看？' },
@@ -33,6 +35,7 @@ const QUICK_QUESTIONS = [
 export default function AskScreen() {
   const route = useRoute<AskRouteProp>();
   const navigation = useNavigation<AskTabNavProp>();
+  const drawerNav = useNavigation<AskDrawerNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
   const {
     sessionId, messages, question, isLoading, isStreaming, error, latestResult, thinkingSteps,
@@ -134,9 +137,17 @@ export default function AskScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerTextGroup}>
-            <Text style={styles.title}>问股</Text>
-            <Text style={styles.description}>输入股票问题，查看 AI 分析</Text>
+          <View style={styles.headerLeft}>
+            <Pressable
+              style={styles.menuButton}
+              onPress={() => drawerNav.openDrawer()}
+            >
+              <Text style={styles.menuIcon}>☰</Text>
+            </Pressable>
+            <View style={styles.headerTextGroup}>
+              <Text style={styles.title}>问股</Text>
+              <Text style={styles.description}>输入股票问题，查看 AI 分析</Text>
+            </View>
           </View>
           <View style={styles.headerRight}>
             <Pressable
@@ -171,7 +182,9 @@ export default function AskScreen() {
             <Text style={styles.emptyIcon}>💬</Text>
             <Text style={styles.emptyTitle}>开始问股</Text>
             <Text style={styles.emptyDescription}>
-              输入股票代码或名称，AI 将为您分析行情走势和技术指标。
+              {useAgentMode
+                ? '输入股票相关问题，AI 将自主分析并给出见解。'
+                : '输入股票代码或名称，AI 将为您分析行情走势和技术指标。'}
             </Text>
             <View style={styles.quickQuestions}>
               {QUICK_QUESTIONS.map((q) => (
@@ -192,6 +205,17 @@ export default function AskScreen() {
               const isLastAssistant =
                 msg.role === 'assistant' && index === messages.length - 1;
               const showRetry = isLastAssistant && !!error && !isLoading;
+              // 从 thinking_json 恢复思考过程（历史消息）
+              let msgThinkingSteps: ThinkingStep[] | undefined;
+              if (msg.role === 'assistant' && msg.thinking_json) {
+                try {
+                  msgThinkingSteps = JSON.parse(msg.thinking_json);
+                } catch {
+                  // ignore parse error
+                }
+              }
+              // 最后一条 assistant 消息用实时 thinkingSteps，历史消息用解析的
+              const steps = isLastAssistant && useAgentMode ? thinkingSteps : msgThinkingSteps;
               return (
                 <MessageBubble
                   key={`${msg.id}-${index}`}
@@ -200,7 +224,7 @@ export default function AskScreen() {
                   answerType={msg.answer_type}
                   isStreaming={isLastAssistant && isStreaming}
                   news={isLastAssistant ? latestResult?.news : undefined}
-                  thinkingSteps={isLastAssistant && useAgentMode ? thinkingSteps : undefined}
+                  thinkingSteps={steps}
                   onRetry={showRetry ? onRetry : undefined}
                 />
               );
@@ -363,6 +387,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenHorizontal,
     marginTop: spacing.sm,
     marginBottom: spacing.md,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  menuButton: {
+    paddingRight: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  menuIcon: {
+    fontSize: 22,
+    color: colors.textPrimary,
+    fontWeight: '700',
   },
   headerTextGroup: {
     flex: 1,

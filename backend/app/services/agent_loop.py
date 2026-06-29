@@ -41,8 +41,7 @@ def run_agent_loop(
       - {"type":"done","success":bool,"error":str|None}
     """
     registry = _get_tool_registry()
-    # 排除 search_stock（股票代码已在 ask.py 中预解析）
-    tools = [t for t in registry.get_openai_tools() if t["function"]["name"] != "search_stock"]
+    tools = registry.get_openai_tools()
     start_time = time.time()
 
     # 构建完整的 messages 列表（含 system prompt）

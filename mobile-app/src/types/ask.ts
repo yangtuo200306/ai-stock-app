@@ -30,6 +30,7 @@ export interface AskMessage {
   answer_type?: string | null;
   ai_status?: string | null;
   model?: string | null;
+  thinking_json?: string | null;
   created_at: string;
 }
 
@@ -54,4 +55,13 @@ export interface ThinkingStep {
   success?: boolean;
   duration?: number;
   message?: string;
+}
+
+export interface SessionItem {
+  id: string;
+  title: string;
+  stock_code: string;
+  stock_name: string;
+  updated_at: string;
+  message_count: number;
 }

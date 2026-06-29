@@ -99,6 +99,8 @@ ai-stock-app/
 | v1.9.2 | 流式响应（SSE 逐字输出、光标闪烁、LLM 失败降级、记录保存） |
 | v1.9.3 | 资讯/新闻集成（akshare 新闻源、Prompt 注入、前端新闻卡片、分析报告相关资讯） |
 | v1.9.4 | 轻量 Agent（Function Calling：Tool Registry + ReAct Loop + 思考过程面板 + 两种模式切换） |
+| v1.9.5 | Agent 模式基础优化（输入零限制、原则式 prompt、search_stock 加回、context 通道、思考过程持久化） |
+| v2.0 | Agent 功能增强（工具生态扩展、多股对比分析、持续增强） |
 
 ## 文档索引
 

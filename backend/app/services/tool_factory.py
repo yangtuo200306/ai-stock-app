@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from app.services.market_data import get_stock_quote as _get_stock_quote
-from app.services.technical_indicators import build_technical_indicators as _build_technical_indicators
 from app.services.market_data import get_stock_history as _get_stock_history
+from app.services.market_overview import get_market_indices as _get_market_indices
+from app.services.market_overview import get_sector_rankings as _get_sector_rankings
 from app.services.news_fetcher import fetch_news as _fetch_news
 from app.services.report_builder import build_analysis_report as _build_analysis_report
 from app.services.stock_resolver import resolve_stock_input as _resolve_stock_input
+from app.services.technical_indicators import build_technical_indicators as _build_technical_indicators
 from app.services.tool_registry import ToolRegistry, ToolDefinition
 
 
@@ -55,6 +57,16 @@ def _handle_search_stock(query: str) -> dict:
     if code:
         return {"found": True, "stock_code": code}
     return {"found": False, "stock_code": None}
+
+
+def _handle_get_market_indices() -> dict:
+    """获取 A 股主要指数实时行情。"""
+    return _get_market_indices()
+
+
+def _handle_get_sector_rankings(top_n: int = 5) -> dict:
+    """获取行业板块涨跌排行。"""
+    return _get_sector_rankings(top_n=top_n)
 
 
 def create_tool_registry() -> ToolRegistry:
@@ -143,6 +155,31 @@ def create_tool_registry() -> ToolRegistry:
             "required": ["query"],
         },
         handler=_handle_search_stock,
+    ))
+
+    registry.register(ToolDefinition(
+        name="get_market_indices",
+        description="获取 A 股主要指数实时行情，包括上证指数、深证成指、创业板指等。当用户询问大盘走势、市场整体表现时调用。",
+        parameters={
+            "type": "object",
+            "properties": {},
+        },
+        handler=_handle_get_market_indices,
+    ))
+
+    registry.register(ToolDefinition(
+        name="get_sector_rankings",
+        description="获取行业板块涨跌排行。当用户询问哪些板块涨得好、板块轮动情况时调用。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "top_n": {
+                    "type": "integer",
+                    "description": "返回前 N 个板块，默认 5",
+                },
+            },
+        },
+        handler=_handle_get_sector_rankings,
     ))
 
     return registry

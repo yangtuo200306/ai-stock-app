@@ -77,15 +77,16 @@ def _update_ask_session(
 def _write_ask_message(
     session_id: str, user_id: str, role: str, content: str,
     answer_type: str | None = None, ai_status: str | None = None, model: str | None = None,
+    thinking_json: str | None = None,
 ) -> int:
     with get_connection() as connection:
         cursor = connection.execute(
             """
             INSERT INTO ask_messages
-                (session_id, user_id, role, content, answer_type, ai_status, model)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (session_id, user_id, role, content, answer_type, ai_status, model, thinking_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (session_id, user_id, role, content, answer_type, ai_status, model),
+            (session_id, user_id, role, content, answer_type, ai_status, model, thinking_json),
         )
         return cursor.lastrowid
 
@@ -94,7 +95,7 @@ def _get_ask_messages(session_id: str, user_id: str, limit: int = 6) -> list[dic
     with get_connection() as connection:
         rows = connection.execute(
             """
-            SELECT id, session_id, role, content, answer_type, ai_status, model, created_at
+            SELECT id, session_id, role, content, answer_type, ai_status, model, thinking_json, created_at
             FROM ask_messages
             WHERE session_id = ? AND user_id = ?
             ORDER BY id ASC

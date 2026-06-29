@@ -287,17 +287,166 @@ v1.9.1 (Prompt优化) → v1.9.2 (流式响应) → v1.9.3 (新闻) → v1.9.4 (
 - 用户能看到 AI 思考→查数据→分析的全过程
 - 两种模式可对比测试
 
-### v1.9.5：多股对比分析（规划中）
+### v1.9.5：Agent 模式基础优化 ✅ 已完成
 
-**范围：** `backend/app/services/` + `mobile-app/src/screens/AskScreen.tsx`
+**范围：** `backend/app/api/ask.py` + `backend/app/services/` + `mobile-app/src/`
 
 **内容：**
-1. 多股对比分析（基于 Agent 能力）
-2. 其他高级分析能力
+1. **输入零限制** — 去掉 `stock_code` 强制校验，用户想问什么就输入什么
+2. **System Prompt 改原则式** — 不给固定模板，让 LLM 自主决定回答结构
+3. **加回 `search_stock` 工具** — LLM 自己搜索股票代码，不再在 API 层预解析
+4. **多轮对话 context 通道** — 传递上一轮的股票上下文和工具结果摘要
+5. **思考过程持久化** — 历史消息的思考过程也能查看
+
+**附加优化：**
+- 无 stock_code 时跳过 `_build_minimal_report`，避免无用日志
+- 通用会话标题用用户问题前 20 字
+- 空状态提示文字随模式切换
+- 降级路径兼容无 stock_code 场景
 
 **完成后效果：**
-- 用户可问"对比茅台和五粮液"
-- AI 同时分析多只股票并给出对比结论
+- 用户可输入"茅台怎么样"、"今天大盘如何"等自然语言，不再强制 6 位代码
+- AI 回答结构灵活，根据问题自主决定组织形式
+- 多轮对话上下文连贯，不丢失上一轮的分析状态
+- 历史消息的思考过程可回溯查看
+
+---
+
+## 阶段六：Agent 功能增强（v2.0）
+
+**目标：** 在 v1.9.5 基础优化之上，扩展 Agent 的工具生态和分析能力，让 Agent 覆盖更多股票分析场景。
+
+**为什么放在 v1.9.5 之后？**
+- v1.9.5 解决了 Agent 的基础体验问题（输入限制、prompt 模板化、多轮上下文、思考持久化）
+- 地基打牢后，加新工具和新能力才稳
+
+**学习主题：** 工具设计模式 — 从"怎么让 LLM 调工具"到"怎么设计 LLM 好调的工具"
+- 工具粒度：一个工具该做多少事
+- 参数设计：LLM 能理解的参数名和描述
+- 返回结构：LLM 好消化的数据格式
+- 缓存策略：不同数据的不同 TTL
+- 数据源封装：主源 + 备源 + 降级
+
+### 设计决策
+
+| # | 决策 | 结论 | 理由 |
+|---|------|------|------|
+| 1 | 加几个新工具？ | **3 个**（大盘、板块、基本面） | 技术指标扩展现有工具，不新增 |
+| 2 | 工具粒度 | **各 1 个，不拆细** | 工具越少，LLM 选择成本越低 |
+| 3 | 并行执行 | **v2.0 不做** | 串行 3 个工具约 6-9 秒，有 thinking 事件顶着可接受 |
+| 4 | 跨股票切换 | **交给 LLM 自己处理** | LLM 看到历史消息会自己调 search_stock |
+| 5 | 缓存方案 | **cachetools 轻量 TTL 缓存** | 个人 App 不需要 Redis，单实例够用 |
+| 6 | 无 stock_code 的对话 | **通过会话列表访问，不存 records** | records 表设计初衷是个股分析记录 |
+| 7 | 会话历史入口 | **左侧抽屉导航** | 符合聊天 App 交互习惯 |
+
+### 范围边界
+
+**做：**
+- 后端：3 个新工具（大盘行情、板块排行、基本面数据）
+- 后端：扩展技术指标（MACD、KDJ）
+- 后端：统一缓存层（cachetools）
+- 后端：会话列表 API（GET /api/sessions）
+- 前端：左侧抽屉会话历史
+- 前端：无 stock_code 对话的访问入口
+- 文档：更新数据流/架构/学习笔记
+
+**不做：**
+- 并行执行（留到 v2.x）
+- Redis 缓存（个人 App 不需要）
+- 多股对比分析（v2.0.2 再考虑）
+- 港股/美股数据（留到 v2.x）
+- 策略预设（留到 v2.x）
+
+### 数据源策略
+
+所有新工具基于 **akshare**（已安装），不需要新增依赖库。
+
+| 工具 | akshare 接口 | 备源 |
+|------|-------------|------|
+| 大盘行情 | `ak.stock_zh_index_spot_sina()` | 无（新浪接口较稳定） |
+| 板块排行 | `ak.stock_board_industry_name_em()` | 无 |
+| 基本面 | `ak.stock_financial_report_sina()` | 无 |
+| MACD/KDJ | 纯 Python 计算 | 无需外部接口 |
+
+### 缓存策略
+
+| 数据类型 | TTL | 理由 |
+|---------|-----|------|
+| 大盘指数 | 1-2 分钟 | 盘中变化快 |
+| 板块排行 | 5-10 分钟 | 一天变化不大 |
+| 基本面数据 | 1 天 | 几乎不变 |
+| 技术指标 | 5-10 分钟 | 基于历史数据，变化慢 |
+
+### 执行顺序（递进式）
+
+```
+v2.0.1 (大盘+板块+会话抽屉) → v2.0.2 (基本面+技术指标) → v2.0.3 (缓存+收尾)
+```
+
+---
+
+### v2.0.1：大盘行情 + 板块排行 + 会话历史抽屉 ✅ 已完成
+
+**范围：** 后端 3 个文件 + 前端 4 个文件
+
+**后端改动：**
+1. 新增 `backend/app/services/market_service.py` — 大盘行情 + 板块排行数据获取（参考 news_fetcher.py 模式）
+2. 修改 `backend/app/services/tool_factory.py` — 注册 `get_market_indices` 和 `get_sector_rankings` 两个工具
+3. 新增 `backend/app/api/sessions.py` — `GET /api/sessions` 返回最近会话列表
+
+**前端改动：**
+1. 修改 `mobile-app/src/navigation/AppNavigator.tsx` — "问股"tab 指向 DrawerNavigator
+2. 新增 `mobile-app/src/components/SessionDrawer.tsx` — 左侧抽屉会话列表组件
+3. 新增 `mobile-app/src/stores/sessionStore.ts` — 会话列表状态管理
+4. 修改 `mobile-app/src/screens/AskScreen.tsx` — 左上角加 ☰ 按钮
+
+**完成后效果：**
+- Agent 能回答"今天大盘怎么样"、"哪些板块涨得好"
+- 问股页面左侧可滑出最近会话列表，点击恢复历史对话
+- 无股票代码的对话（如"今天大盘怎么样"）也能从会话列表找到
+
+---
+
+### v2.0.2：基本面数据 + 更多技术指标
+
+**范围：** 后端 3 个文件
+
+**后端改动：**
+1. 新增 `backend/app/services/fundamental_service.py` — 基本面数据获取（PE/PB/营收/利润/ROE/毛利率）
+2. 修改 `backend/app/services/tool_factory.py` — 注册 `get_fundamentals` 工具
+3. 修改 `backend/app/services/technical_indicators.py` — 新增 MACD、KDJ 计算
+
+**完成后效果：**
+- Agent 能回答"茅台的 PE 是多少"、"五粮液的基本面怎么样"
+- 技术面分析更全面，包含 MACD 金叉/死叉、KDJ 超买/超卖信号
+
+---
+
+### v2.0.3：缓存统一 + 收尾
+
+**范围：** 后端 2 个文件 + 前端 1 个文件
+
+**后端改动：**
+1. 新增 `backend/app/services/cache_manager.py` — 基于 cachetools 的统一 TTL 缓存层
+2. 修改各 service 文件 — 接入统一缓存
+
+**前端改动：**
+1. 修改 `mobile-app/src/stores/askStore.ts` — 支持从会话列表恢复对话
+
+**完成后效果：**
+- 大盘数据 1-2 分钟缓存，板块数据 5-10 分钟缓存，基本面数据 1 天缓存
+- 同一 session 内重复请求不重复调数据源
+
+---
+
+### 风险评估
+
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| akshare 大盘接口不稳定 | 大盘数据拿不到 | 工具返回友好错误信息，不阻塞 Agent |
+| 板块排行数据量太大 | 响应慢 | top_n 默认 5，限制返回条数 |
+| 基本面数据源变化 | 字段名/格式变化 | 参考 news_fetcher 的异常处理模式 |
+| Drawer 导航影响 Tab 切换 | 导航结构变化 | 先在小范围测试，不影响其他 Tab |
 
 ---
 
@@ -318,7 +467,8 @@ v1.9.1 (Prompt优化) → v1.9.2 (流式响应) → v1.9.3 (新闻) → v1.9.4 (
 | 阶段五（流式响应） | v1.9.2 | ✅ 已完成 |
 | 阶段五（外部知识接入） | v1.9.3 | ✅ 已完成 |
 | 阶段五（轻量 Agent） | v1.9.4 | ✅ 已完成 |
-| 阶段五（多股对比分析） | v1.9.5 | 📋 规划中 |
+| 阶段五（Agent 基础优化） | v1.9.5 | ✅ 已完成 |
+| 阶段六（Agent 功能增强） | v2.0 | 📋 规划中 |
 
 ---
 
@@ -335,8 +485,9 @@ v1.9.1 (Prompt优化) → v1.9.2 (流式响应) → v1.9.3 (新闻) → v1.9.4 (
 | `docs/archive/plans/v1.5-plan.md` | v1.5 公共组件收口计划（已完成） |
 | `docs/archive/plans/v1.6-plan.md` | v1.6 UX 优化计划（已完成） |
 | `docs/archive/releases/v1.8-summary.md` | v1.8 股票数据体系优化总结（已完成） |
-| `docs/v1.9.1-plan.md` | v1.9.1 Prompt 工程优化计划（已完成） |
-| `docs/v1.9.3-plan.md` | v1.9.3 资讯/新闻集成计划（已完成） |
+| `docs/archive/releases/v1.9-summary.md` | v1.9 版本总结（已完成） |
+| `docs/archive/plans/v1.9.1-plan.md` | v1.9.1 Prompt 工程优化计划（已完成） |
+| `docs/archive/plans/v1.9.3-plan.md` | v1.9.3 资讯/新闻集成计划（已完成） |
 | `docs/archive/learning/learning-notes-v1.0-v1.7.md` | v1.0~v1.7 学习笔记（已归档） |
 | `docs/learning-notes.md` | v1.8+ 进阶学习记录 |
 | `docs/archive/code-review-notes.md` | 代码问题与隐患记录（已归档） |

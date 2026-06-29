@@ -306,6 +306,17 @@ export const useAskStore = create<AskState & AskActions>((set, get) => ({
               }
               if (event.success === false) {
                 shouldFallback = true;
+              } else {
+                // 成功完成，将 thinkingSteps 保存到消息
+                const thinkingJson = JSON.stringify(get().thinkingSteps);
+                set(state => {
+                  const msgs = [...state.messages];
+                  const last = msgs[msgs.length - 1];
+                  if (last.role === 'assistant') {
+                    msgs[msgs.length - 1] = { ...last, thinking_json: thinkingJson };
+                  }
+                  return { messages: msgs };
+                });
               }
               break;
           }
@@ -313,9 +324,14 @@ export const useAskStore = create<AskState & AskActions>((set, get) => ({
         () => {
           // onDone
           if (shouldFallback) {
-            // Agent 内部失败，降级到传统流式
-            set({ isStreaming: false, thinkingSteps: [] });
-            get().handleAskStream(stockCode);
+            if (stockCode) {
+              // 有股票代码时降级到传统流式
+              set({ isStreaming: false, thinkingSteps: [] });
+              get().handleAskStream(stockCode);
+            } else {
+              // 无股票代码时标准模式也无法处理，直接报错
+              set({ isStreaming: false, isLoading: false, error: 'Agent 分析失败，请重试或提供股票代码', thinkingSteps: [] });
+            }
             return;
           }
           set({
@@ -328,9 +344,13 @@ export const useAskStore = create<AskState & AskActions>((set, get) => ({
           useRecordsStore.getState().fetchRecords();
         },
         (error) => {
-          // onError - 降级到传统流式
+          // onError - 有股票代码时降级到传统流式
           set({ isStreaming: false, thinkingSteps: [] });
-          get().handleAskStream(stockCode);
+          if (stockCode) {
+            get().handleAskStream(stockCode);
+          } else {
+            set({ isLoading: false, error: error || 'Agent 分析失败，请重试或提供股票代码' });
+          }
         },
       );
     } catch (err: unknown) {

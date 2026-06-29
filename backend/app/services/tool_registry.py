@@ -73,4 +73,6 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
     "get_stock_news": "获取相关新闻",
     "get_analysis_report": "生成分析报告",
     "search_stock": "搜索股票",
+    "get_market_indices": "获取大盘行情",
+    "get_sector_rankings": "获取板块排行",
 }
