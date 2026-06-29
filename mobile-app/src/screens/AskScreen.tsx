@@ -35,11 +35,12 @@ export default function AskScreen() {
   const navigation = useNavigation<AskTabNavProp>();
   const { isLoggedIn, isLoading: authLoading } = useAuth();
   const {
-    sessionId, messages, question, isLoading, isStreaming, error, latestResult,
-    setQuestion, handleAskStream, handleNewSession, handleAddToWatchlist, restoreSession,
+    sessionId, messages, question, isLoading, isStreaming, error, latestResult, thinkingSteps,
+    setQuestion, handleAskAgentStream, handleAskStream, handleNewSession, handleAddToWatchlist, restoreSession,
   } = useAskStore();
   const [addToWatchlistLoading, setAddToWatchlistLoading] = useState(false);
   const [selectedStock, setSelectedStock] = useState<{ code: string; name: string } | null>(null);
+  const [useAgentMode, setUseAgentMode] = useState(true);
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
   const initialParamsHandled = useRef(false);
@@ -76,11 +77,12 @@ export default function AskScreen() {
   }, [handleNewSession]);
 
   const onAsk = useCallback(() => {
-    handleAskStream(selectedStock?.code).then(() => {
+    const askFn = useAgentMode ? handleAskAgentStream : handleAskStream;
+    askFn(selectedStock?.code).then(() => {
       setSelectedStock(null);
       scrollToEnd();
     });
-  }, [handleAskStream, selectedStock, scrollToEnd]);
+  }, [useAgentMode, handleAskAgentStream, handleAskStream, selectedStock, scrollToEnd]);
 
   const onQuickQuestion = useCallback((q: string) => {
     setQuestion(q);
@@ -89,10 +91,11 @@ export default function AskScreen() {
   }, [setQuestion]);
 
   const onRetry = useCallback(() => {
-    handleAskStream(selectedStock?.code).then(() => {
+    const askFn = useAgentMode ? handleAskAgentStream : handleAskStream;
+    askFn(selectedStock?.code).then(() => {
       scrollToEnd();
     });
-  }, [handleAskStream, selectedStock, scrollToEnd]);
+  }, [useAgentMode, handleAskAgentStream, handleAskStream, selectedStock, scrollToEnd]);
 
   const onAddToWatchlist = useCallback(async () => {
     setAddToWatchlistLoading(true);
@@ -135,14 +138,24 @@ export default function AskScreen() {
             <Text style={styles.title}>问股</Text>
             <Text style={styles.description}>输入股票问题，查看 AI 分析</Text>
           </View>
-          {(sessionId || messages.length > 0) && (
-            <AppButton
-              title="新建会话"
-              variant="ghost"
-              onPress={onNewSession}
-              style={styles.newSessionButton}
-            />
-          )}
+          <View style={styles.headerRight}>
+            <Pressable
+              style={[styles.modeToggle, useAgentMode && styles.modeToggleActive]}
+              onPress={() => setUseAgentMode(!useAgentMode)}
+            >
+              <Text style={[styles.modeToggleText, useAgentMode && styles.modeToggleTextActive]}>
+                {useAgentMode ? 'Agent' : '标准'}
+              </Text>
+            </Pressable>
+            {(sessionId || messages.length > 0) && (
+              <AppButton
+                title="新建会话"
+                variant="ghost"
+                onPress={onNewSession}
+                style={styles.newSessionButton}
+              />
+            )}
+          </View>
         </View>
 
         {/* Messages / Content Area */}
@@ -187,6 +200,7 @@ export default function AskScreen() {
                   answerType={msg.answer_type}
                   isStreaming={isLastAssistant && isStreaming}
                   news={isLastAssistant ? latestResult?.news : undefined}
+                  thinkingSteps={isLastAssistant && useAgentMode ? thinkingSteps : undefined}
                   onRetry={showRetry ? onRetry : undefined}
                 />
               );
@@ -203,15 +217,15 @@ export default function AskScreen() {
               </View>
             ) : null}
 
-            {/* Loading Indicator */}
-            {isLoading ? (
+            {/* Loading Indicator - only show in standard mode */}
+            {isLoading && !useAgentMode ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>分析中...</Text>
               </View>
             ) : null}
 
-            {/* Result Card */}
-            {latestResult ? (
+            {/* Result Card - only show in standard mode */}
+            {latestResult && !useAgentMode ? (
               <AppCard style={{ marginTop: spacing.sm }}>
                 <Text style={styles.stockName}>
                   {latestResult.stock_name}（{latestResult.stock_code}）
@@ -366,6 +380,31 @@ const styles = StyleSheet.create({
     minHeight: 36,
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  modeToggle: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+  },
+  modeToggleActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  modeToggleText: {
+    ...typography.helper,
+    color: colors.textMuted,
+    fontWeight: '600',
+  },
+  modeToggleTextActive: {
+    color: colors.textInverse,
   },
   scrollContainer: {
     flex: 1,

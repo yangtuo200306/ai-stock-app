@@ -247,3 +247,111 @@ def _is_relevant(title, stock_code, stock_name):
 **为什么够用？** 搜索时已经用了 `"600519 贵州茅台"` 作为关键词，财经新闻网站的搜索本身就会按相关性排序。后置过滤只是去掉标题里完全不提这只股票的"杂音"。
 
 **工程原则：** 先做简单的，验证不够再升级。不要一开始就上复杂方案。
+
+---
+
+## v1.9.4 学习要点
+
+### 17. Function Calling：LLM 不只是聊天，还能"调用工具"
+
+**核心概念：** 给 LLM 一套"工具说明书"（OpenAI 格式的 function schema），LLM 决定要不要调、调什么、传什么参数。LLM 只负责"决策"，执行由后端代码完成。
+
+```
+你发消息 + tools 定义 → LLM 返回 tool_calls → 后端执行工具 → 结果回填 → LLM 生成最终回答
+```
+
+**和传统 Prompt 的区别：**
+- 传统：所有数据预先取好塞进 Prompt，LLM 只负责"写回答"
+- FC：LLM 自己决定需要什么数据，按需调用
+
+### 18. ReAct 循环（Reasoning + Acting）
+
+Agent 的核心执行模式：LLM 在"推理"和"行动"之间交替。
+
+```
+思考 → 调工具 → 看结果 → 再思考 → 再调工具 → ... → 生成最终答案
+```
+
+**保护机制：** `max_steps=5` 防止死循环，单步超时 30s，整体超时 120s。
+
+### 19. SSE 事件协议设计
+
+Agent 循环是多步的，不能等全部完成再返回。需要用 SSE 逐条推送事件：
+
+```
+data: {"type":"thinking","message":"AI 正在分析..."}
+data: {"type":"tool_start","tool":"get_stock_quote","display_name":"获取实时行情"}
+data: {"type":"tool_done","tool":"get_stock_quote","success":true,"duration":0.5}
+data: {"type":"text","content":"根据最新数据..."}
+data: {"type":"done","success":true,"session_id":"xxx","full_answer":"..."}
+```
+
+**关键教训：** 字符串匹配 JSON 不靠谱。`json.dumps` 输出 `"type": "text"`（冒号后有空格），但手写检查条件 `'"type":"text"'`（无空格）永远匹配不上。必须用 `json.loads()` 正确解析。
+
+### 20. Tool Registry 模式
+
+工具注册表模式：集中管理所有工具的定义和 handler。
+
+```python
+class ToolRegistry:
+    _tools: dict[str, ToolDefinition]
+
+    def register(self, tool): ...      # 注册工具
+    def get_openai_tools(self): ...    # 转 OpenAI 格式
+    def execute(self, name, **kwargs): # 执行工具
+```
+
+**好处：** 加新能力 = 注册一个新 tool，零管线改动。后续加大盘行情、板块排行、基本面数据都只需要一行注册。
+
+### 21. 三层降级链
+
+Agent 模式有完整的降级保护：
+
+```
+Agent 失败（HTTP 非 200）→ 传统流式
+Agent 成功但内部 LLM 失败（done: success: false）→ 传统流式
+传统流式失败 → 非流式 LLM
+非流式 LLM 失败 → 规则回答（模板拼接）
+```
+
+**竞态问题：** `done` 事件回调里直接调降级函数，会和 `onDone` 回调形成竞态（一个设 `isLoading=true`，另一个设 `isLoading=false`）。修复方案：用 `shouldFallback` 标记延迟到 `onDone` 再执行。
+
+### 22. Agent 模式的数据通道差异
+
+| | 标准模式 | Agent 模式 |
+|--|---------|-----------|
+| 数据获取 | 预先全部取好 | LLM 按需调工具 |
+| 数据到前端 | 通过 `result_data` 结构化通道 | 工具结果只进 LLM 上下文 |
+| 新闻展示 | NewsCard 组件（结构化数据） | LLM 输出 Markdown 链接 |
+| 结果卡片 | ✅ | ❌（纯对话） |
+
+**新闻链接的修复：** 不用额外通道，让 LLM 输出 `[标题](url)` Markdown 格式，前端 Markdown 渲染器自动处理点击。零额外代码。
+
+### 23. `--reload` 的正确用法
+
+`uvicorn --reload` 默认监控整个项目目录，包括 `logs/`。代码有 bug 时：
+
+```
+改代码 → WatchFiles 检测到 → 重启
+  → 报错写入 logs/app.log
+  → WatchFiles 检测到日志变化 → 又重启
+  → 死循环
+```
+
+**修复：** 加 `--reload-dir app` 只监控源码目录：
+
+```powershell
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
+```
+
+### 24. 对话记忆长度
+
+`_get_ask_messages(session_id, user_id, limit=6)` 控制传给 LLM 的历史消息数量。
+
+| limit | 对应轮数 | 适用场景 |
+|-------|---------|---------|
+| 4 | 2 轮 | 太短，聊两句就失忆 |
+| 6 | 3 轮 | 股票分析场景够用 |
+| 10 | 5 轮 | 比较充裕 |
+
+**工具结果不持久化：** 工具调用结果只存在于当前 Agent 循环中（内存），不会存到数据库。下一轮对话需要重新调工具获取。这对股票分析是合理的——数据时效性强，重新获取是正确的行为。

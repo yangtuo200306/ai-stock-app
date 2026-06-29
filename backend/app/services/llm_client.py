@@ -281,3 +281,97 @@ def ask_llm_stream(
                     continue
 
     logger.info("LLM 流式请求完成: model=%s", model)
+
+
+def ask_llm_with_tools_stream(
+    messages: list[dict],
+    tools: list[dict],
+) -> Generator[dict, None, None]:
+    """
+    流式调用 LLM（带 Function Calling 工具）。
+
+    每次 yield 一个事件字典：
+      - {"type": "text", "content": str}          — 文本 delta
+      - {"type": "tool_call_start", "id": str, "name": str}  — 工具调用开始
+      - {"type": "tool_call_arg", "id": str, "arguments": str} — 工具参数 delta
+
+    调用方负责将 tool_calls 按 id 聚合后执行。
+    """
+    api_key, base_url, model = _get_llm_config()
+
+    url = f"{base_url.rstrip('/')}/chat/completions"
+
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.7,
+        "max_tokens": 2048,
+        "stream": True,
+        "tools": tools,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    logger.info("LLM 流式 Tool Calling 请求开始: model=%s, tools=%s", model, [t["function"]["name"] for t in tools])
+    resp = requests.post(url, json=payload, headers=headers, stream=True, timeout=60)
+
+    current_tool_calls: dict[str, dict] = {}
+
+    for line in resp.iter_lines():
+        if line:
+            line = line.decode("utf-8")
+            if line.startswith("data: "):
+                data_str = line[6:]
+                if data_str == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data_str)
+                except json.JSONDecodeError:
+                    continue
+
+                choices = chunk.get("choices", [])
+                if not choices:
+                    continue
+
+                delta = choices[0].get("delta", {})
+
+                # 文本内容
+                content = delta.get("content")
+                if content:
+                    yield {"type": "text", "content": content}
+
+                # tool_calls
+                tool_calls_delta = delta.get("tool_calls")
+                if tool_calls_delta:
+                    for tc in tool_calls_delta:
+                        tc_index = tc.get("index", 0)
+                        tc_id = tc.get("id")
+                        tc_function = tc.get("function", {})
+
+                        if tc_id:
+                            # 新 tool_call 开始
+                            current_tool_calls[str(tc_index)] = {
+                                "id": tc_id,
+                                "name": tc_function.get("name", ""),
+                                "arguments": tc_function.get("arguments", ""),
+                            }
+                            yield {
+                                "type": "tool_call_start",
+                                "id": tc_id,
+                                "name": tc_function.get("name", ""),
+                            }
+                        elif str(tc_index) in current_tool_calls:
+                            # 累积参数
+                            arg_delta = tc_function.get("arguments", "")
+                            if arg_delta:
+                                current_tool_calls[str(tc_index)]["arguments"] += arg_delta
+                                yield {
+                                    "type": "tool_call_arg",
+                                    "id": current_tool_calls[str(tc_index)]["id"],
+                                    "arguments": arg_delta,
+                                }
+
+    logger.info("LLM 流式 Tool Calling 请求完成: model=%s", model)

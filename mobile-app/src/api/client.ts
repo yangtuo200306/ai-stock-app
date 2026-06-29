@@ -167,4 +167,82 @@ export async function apiPostStream(
   onDone(response.headers);
 }
 
+export async function apiPostAgentStream(
+  path: string,
+  body: object,
+  onEvent: (event: { type: string; [key: string]: unknown }) => void,
+  onDone: () => void,
+  onError: (error: string) => void,
+): Promise<void> {
+  const base = await getBaseUrl();
+  const token = await getToken();
+  const response = await fetch(`${base}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    let message = '请求失败';
+    try {
+      const err = await response.json();
+      const { message: msg } = extractErrorMessage(err);
+      message = msg;
+    } catch {
+      // ignore
+    }
+    onError(message);
+    return;
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    onError('响应流不可用');
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // 解析 SSE 事件（可能一次收到多个 data: ...\n\n）
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // 保留未完成的行
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const event = JSON.parse(line.slice(6));
+            onEvent(event);
+          } catch {
+            // 跳过解析失败的事件
+          }
+        }
+      }
+    }
+    // 处理 buffer 中剩余内容
+    if (buffer.startsWith('data: ')) {
+      try {
+        const event = JSON.parse(buffer.slice(6));
+        onEvent(event);
+      } catch {
+        // ignore
+      }
+    }
+  } catch (err) {
+    onError(err instanceof Error ? err.message : '流读取失败');
+    return;
+  }
+
+  onDone();
+}
+
 export { STORAGE_KEYS };

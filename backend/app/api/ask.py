@@ -20,6 +20,7 @@ from app.services.ask_service import (
     _get_ask_messages,
     _write_or_update_ask_record,
 )
+from app.services.agent_loop import run_agent_loop
 from app.services.llm_client import LlmError, ask_llm, ask_llm_stream
 from app.services.indicators_schema import Indicators
 from app.services.market_data import MarketDataError, get_stock_history, get_stock_quote
@@ -259,6 +260,7 @@ def ask_stock_stream(
     if session:
         session_id = session["session_id"]
         title = session["title"]
+        stock_name = session["stock_name"]
         _write_ask_message(session_id, user_id, "user", ask.question or "")
     else:
         title = _build_conversation_title(report["stock_name"], report["stock_code"])
@@ -345,5 +347,197 @@ def ask_stock_stream(
         headers={
             "X-Result-Data": result_data,
             "Cache-Control": "no-cache",
+        },
+    )
+
+
+@router.post("/ask/agent/stream")
+def ask_agent_stream(
+    ask: AskCreate,
+    authorization: str = Header(...),
+):
+    """Agent 模式问股（Function Calling），流式返回 SSE 事件。"""
+    user_id = get_current_user_id(authorization)
+
+    # --- resolve session (必须先于 stock_code，因为多轮对话时问题可能不含股票代码) ---
+    session = None
+    is_new_session = False
+    if ask.session_id:
+        session = _get_ask_session(ask.session_id, user_id)
+
+    # --- resolve stock code ---
+    stock_code = None
+    if session:
+        stock_code = session["stock_code"]
+    elif ask.stock_code:
+        stock_code = ask.stock_code.strip()
+    elif ask.question:
+        extracted = _extract_stock_code(ask.question)
+        if not extracted:
+            supported = "、".join(get_supported_names())
+            raise api_error(400, ErrorCode.STOCK_NOT_FOUND,
+                             f"问题中未找到 6 位股票代码或已支持的股票名称（当前支持：{supported}），请提供例如：600519 怎么看？")
+        stock_code = extracted
+    else:
+        raise api_error(400, ErrorCode.MISSING_STOCK_CODE, "请提供股票代码或包含股票代码的问题")
+
+    # --- build conversation messages ---
+    conversation_messages = None
+    if session:
+        conversation_messages = _get_ask_messages(session["session_id"], user_id)
+
+    # --- create session & write user message before streaming ---
+    model_name = settings.LLM_MODEL or None
+
+    if session:
+        session_id = session["session_id"]
+        title = session["title"]
+        stock_name = session["stock_name"]
+        _write_ask_message(session_id, user_id, "user", ask.question or "")
+    else:
+        # 先获取股票名称用于创建会话
+        from app.services.market_data import get_stock_quote
+        try:
+            quote = get_stock_quote(stock_code)
+            stock_name = quote.name
+        except Exception:
+            stock_name = stock_code
+        title = _build_conversation_title(stock_name, stock_code)
+        session_id = _create_ask_session(
+            user_id, stock_code, stock_name, title, "",
+            ask.question or "", "", "ai", "ok", model_name,
+        )
+        _write_ask_message(session_id, user_id, "user", ask.question or "")
+        is_new_session = True
+
+    # --- build system prompt ---
+    system_prompt = (
+        "你是专业的股票分析助手，擅长用通俗易懂的语言向个人投资者解释股票走势。\n"
+        "你的分析风格：客观、简洁、有依据。\n"
+        "你输出的每个结论都必须基于通过工具获取的真实数据，不猜测、不编造。\n"
+        f"股票代码 {stock_code}（{stock_name}）已确认，无需调用 search_stock 搜索。\n"
+        "你可以使用以下工具来获取所需数据：\n"
+        "  - get_stock_quote：获取实时行情\n"
+        "  - get_technical_indicators：获取技术指标\n"
+        "  - get_stock_news：获取相关新闻\n"
+        "  - get_analysis_report：获取综合分析报告\n"
+        "根据用户问题，自主决定需要调用哪些工具。\n"
+        "请按以下结构回答：\n"
+        "【结论】一句话直接回答用户问题\n"
+        "【关键数据】列出最重要的 3-4 个数据点\n"
+        "【详细分析】展开说明\n"
+        "【风险提示】列出主要风险点\n"
+        "引用新闻时请使用 Markdown 链接格式：[标题](url)，方便用户点击查看原文。\n"
+        "回答末尾必须包含：仅供学习参考，不构成投资建议。"
+    )
+
+    # --- build user messages ---
+    user_messages = []
+    if conversation_messages:
+        for msg in conversation_messages:
+            user_messages.append({"role": msg["role"], "content": msg["content"]})
+    user_messages.append({"role": "user", "content": ask.question or f"{stock_code} 怎么样？"})
+
+    # --- build minimal report for record saving ---
+    def _build_minimal_report(code: str) -> dict:
+        from app.services.market_data import get_stock_history, get_stock_quote
+        from app.services.technical_indicators import build_technical_indicators
+        from app.services.report_builder import build_analysis_report
+        try:
+            quote = get_stock_quote(code)
+            history = get_stock_history(code)
+            technicals = build_technical_indicators(quote, history)
+            report = build_analysis_report(quote, technicals)
+            return {
+                "stock_code": quote.code,
+                "stock_name": quote.name,
+                "price": quote.price,
+                "score": report["score"],
+                "action": report["action"],
+                "trend": report["trend"],
+                "risks": report.get("risks", []),
+                "indicators": {
+                    "change_pct": quote.change_pct,
+                    "turnover_rate": quote.turnover_rate,
+                    "amplitude": quote.amplitude,
+                    **technicals,
+                },
+            }
+        except Exception:
+            return {
+                "stock_code": code,
+                "stock_name": code,
+                "price": 0,
+                "score": 0,
+                "action": "分析",
+                "trend": "待评估",
+                "risks": [],
+                "indicators": {"change_pct": 0},
+            }
+
+    # --- run agent loop ---
+    def _stream_agent():
+        full_answer = ""
+        try:
+            for sse_event in run_agent_loop(
+                system_prompt=system_prompt,
+                messages=user_messages,
+                session_id=session_id,
+            ):
+                yield sse_event
+                # 解析 JSON 事件，从 text 事件中累积完整文本
+                try:
+                    data_str = sse_event
+                    if data_str.startswith("data: "):
+                        data_str = data_str[6:]
+                    evt = json.loads(data_str.strip())
+                    if evt.get("type") == "text" and evt.get("content"):
+                        full_answer += evt["content"]
+                except Exception:
+                    pass
+        finally:
+            # 保存会话 & 记录
+            logger.info("[DEBUG] Agent 流结束: full_answer_len=%d, session_id=%s, has_session=%s",
+                        len(full_answer), session_id, session is not None)
+            if full_answer:
+                try:
+                    summary = full_answer[:80] if len(full_answer) > 80 else full_answer
+                    final_answer_type = "ai"
+                    final_ai_status = "ok"
+                    logger.info("[DEBUG] 开始构建 minimal_report")
+                    minimal_report = _build_minimal_report(stock_code)
+                    logger.info("[DEBUG] minimal_report 构建完成: score=%s", minimal_report.get("score"))
+                    if session:
+                        logger.info("[DEBUG] 更新已有会话: session=%s", session_id)
+                        _update_ask_session(session_id, ask.question or "", full_answer, summary,
+                                            final_answer_type, final_ai_status, model_name)
+                        _write_ask_message(session_id, user_id, "assistant", full_answer,
+                                           answer_type=final_answer_type, ai_status=final_ai_status, model=model_name)
+                        _write_or_update_ask_record(
+                            minimal_report, ask.question or "", full_answer, final_answer_type, final_ai_status,
+                            model_name, user_id, session_id, is_new=False,
+                        )
+                    else:
+                        logger.info("[DEBUG] 创建新会话: stock=%s", stock_code)
+                        _update_ask_session(session_id, ask.question or "", full_answer, summary,
+                                            final_answer_type, final_ai_status, model_name)
+                        _write_ask_message(session_id, user_id, "assistant", full_answer,
+                                           answer_type=final_answer_type, ai_status=final_ai_status, model=model_name)
+                        _write_or_update_ask_record(
+                            minimal_report, ask.question or "", full_answer, final_answer_type, final_ai_status,
+                            model_name, user_id, session_id, is_new=True,
+                        )
+                    logger.info("[DEBUG] Agent 记录保存成功")
+                except Exception as e:
+                    logger.error("[DEBUG] 保存 Agent 会话记录失败: %s", e, exc_info=True)
+            else:
+                logger.warning("[DEBUG] full_answer 为空，跳过保存")
+
+    return StreamingResponse(
+        _stream_agent(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
         },
     )

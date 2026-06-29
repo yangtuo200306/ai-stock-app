@@ -32,3 +32,26 @@ export interface AskMessage {
   model?: string | null;
   created_at: string;
 }
+
+export interface AgentEvent {
+  type: 'thinking' | 'tool_start' | 'tool_done' | 'text' | 'done';
+  step?: number;
+  message?: string;
+  tool?: string;
+  display_name?: string;
+  success?: boolean;
+  duration?: number;
+  content?: string;
+  session_id?: string;
+  error?: string;
+  result_data?: AskResponse;
+}
+
+export interface ThinkingStep {
+  type: 'thinking' | 'tool_start' | 'tool_done' | 'generating';
+  tool?: string;
+  display_name?: string;
+  success?: boolean;
+  duration?: number;
+  message?: string;
+}

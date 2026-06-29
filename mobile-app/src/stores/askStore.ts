@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { apiPost, apiPostStream } from '../api/client';
-import type { AskMessage, AskResponse } from '../types';
+import { apiPost, apiPostAgentStream, apiPostStream } from '../api/client';
+import type { AskMessage, AskResponse, ThinkingStep } from '../types';
 import { useWatchlistStore } from './watchlistStore';
 import { useRecordsStore } from './recordsStore';
 
@@ -12,12 +12,14 @@ interface AskState {
   isStreaming: boolean;
   error: string;
   latestResult: AskResponse | null;
+  thinkingSteps: ThinkingStep[];
 }
 
 interface AskActions {
   setQuestion: (text: string) => void;
   handleAsk: (stockCode?: string) => Promise<void>;
   handleAskStream: (stockCode?: string) => Promise<void>;
+  handleAskAgentStream: (stockCode?: string) => Promise<void>;
   handleNewSession: () => void;
   handleAddToWatchlist: () => Promise<boolean>;
   restoreSession: (sessionId: string, messages: AskMessage[]) => void;
@@ -32,6 +34,7 @@ const initialState: AskState = {
   isStreaming: false,
   error: '',
   latestResult: null,
+  thinkingSteps: [],
 };
 
 export const useAskStore = create<AskState & AskActions>((set, get) => ({
@@ -196,6 +199,149 @@ export const useAskStore = create<AskState & AskActions>((set, get) => ({
     }
   },
 
+  handleAskAgentStream: async (stockCode?: string) => {
+    const { question, sessionId } = get();
+    if (!question.trim()) {
+      set({ error: '请先输入股票问题' });
+      return;
+    }
+
+    set({ isLoading: true, isStreaming: true, error: '', thinkingSteps: [] });
+
+    // 添加用户消息
+    const userMsg: AskMessage = {
+      id: Date.now(),
+      role: 'user',
+      content: question.trim(),
+      created_at: new Date().toISOString(),
+    };
+
+    // 添加占位 assistant 消息
+    const assistantMsg: AskMessage = {
+      id: Date.now() + 1,
+      role: 'assistant',
+      content: '',
+      answer_type: 'ai',
+      created_at: new Date().toISOString(),
+    };
+
+    set(state => ({
+      messages: [...state.messages, userMsg, assistantMsg],
+      question: '',
+    }));
+
+    try {
+      const body: Record<string, unknown> = { question: question.trim() };
+      if (sessionId) {
+        body.session_id = sessionId;
+      }
+      if (stockCode) {
+        body.stock_code = stockCode;
+      }
+
+      let accumulatedContent = '';
+      let shouldFallback = false;
+      let sessionIdFromDone = '';
+
+      await apiPostAgentStream(
+        '/api/ask/agent/stream',
+        body,
+        (event) => {
+          switch (event.type) {
+            case 'thinking':
+              set(state => ({
+                thinkingSteps: [
+                  ...state.thinkingSteps,
+                  { type: 'thinking', message: event.message as string },
+                ],
+              }));
+              break;
+
+            case 'tool_start':
+              set(state => ({
+                thinkingSteps: [
+                  ...state.thinkingSteps,
+                  {
+                    type: 'tool_start',
+                    tool: event.tool as string,
+                    display_name: event.display_name as string,
+                  },
+                ],
+              }));
+              break;
+
+            case 'tool_done':
+              set(state => {
+                const steps = [...state.thinkingSteps];
+                // 更新最后一个 tool_start 为 tool_done
+                for (let i = steps.length - 1; i >= 0; i--) {
+                  if (steps[i].type === 'tool_start' && steps[i].tool === event.tool) {
+                    steps[i] = {
+                      type: 'tool_done',
+                      tool: event.tool as string,
+                      display_name: event.display_name as string,
+                      success: event.success as boolean,
+                      duration: event.duration as number,
+                    };
+                    break;
+                  }
+                }
+                return { thinkingSteps: steps };
+              });
+              break;
+
+            case 'text':
+              accumulatedContent += (event.content as string) || '';
+              set(state => {
+                const msgs = [...state.messages];
+                const last = msgs[msgs.length - 1];
+                msgs[msgs.length - 1] = { ...last, content: accumulatedContent };
+                return { messages: msgs };
+              });
+              break;
+
+            case 'done':
+              if (event.session_id) {
+                sessionIdFromDone = event.session_id as string;
+              }
+              if (event.success === false) {
+                shouldFallback = true;
+              }
+              break;
+          }
+        },
+        () => {
+          // onDone
+          if (shouldFallback) {
+            // Agent 内部失败，降级到传统流式
+            set({ isStreaming: false, thinkingSteps: [] });
+            get().handleAskStream(stockCode);
+            return;
+          }
+          set({
+            isStreaming: false,
+            isLoading: false,
+            sessionId: sessionIdFromDone || undefined,
+          });
+          // 刷新自选列表摘要和记录列表
+          useWatchlistStore.getState().loadStocks();
+          useRecordsStore.getState().fetchRecords();
+        },
+        (error) => {
+          // onError - 降级到传统流式
+          set({ isStreaming: false, thinkingSteps: [] });
+          get().handleAskStream(stockCode);
+        },
+      );
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? (err as { message: string }).message
+          : '问股失败，请检查后端地址或服务是否启动';
+      set({ error: message, isStreaming: false, isLoading: false, thinkingSteps: [] });
+    }
+  },
+
   handleNewSession: () => {
     set({
       sessionId: null,
@@ -203,6 +349,7 @@ export const useAskStore = create<AskState & AskActions>((set, get) => ({
       latestResult: null,
       question: '',
       error: '',
+      thinkingSteps: [],
     });
   },
 

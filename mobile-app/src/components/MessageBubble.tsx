@@ -5,7 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
-import type { NewsItem } from '../types';
+import type { NewsItem, ThinkingStep } from '../types';
 import { NewsCard } from './NewsCard';
 
 type MessageBubbleProps = {
@@ -15,6 +15,7 @@ type MessageBubbleProps = {
   onRetry?: () => void;
   isStreaming?: boolean;
   news?: NewsItem[];
+  thinkingSteps?: ThinkingStep[];
   style?: StyleProp<ViewStyle>;
 };
 
@@ -29,6 +30,8 @@ const markdownStyles = {
   body: {
     ...typography.longText,
     color: colors.textSecondary,
+    overflow: 'hidden',
+    flexWrap: 'wrap',
   },
   heading1: {
     fontSize: 18,
@@ -82,17 +85,28 @@ const markdownStyles = {
   list_item: {
     marginBottom: 2,
   },
+  link: {
+    color: '#1890ff',
+    textDecorationLine: 'underline' as const,
+  },
 };
 
-export function MessageBubble({ role, content, answerType, onRetry, isStreaming, news, style }: MessageBubbleProps) {
+export function MessageBubble({ role, content, answerType, onRetry, isStreaming, news, thinkingSteps, style }: MessageBubbleProps) {
   const isUser = role === 'user';
   const [copied, setCopied] = useState(false);
+  const [thinkingExpanded, setThinkingExpanded] = useState(false);
 
   const handleCopy = useCallback(async () => {
     await Clipboard.setStringAsync(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }, [content]);
+
+  const hasThinkingSteps = thinkingSteps && thinkingSteps.length > 0;
+  const toolCount = thinkingSteps?.filter(s => s.type === 'tool_done').length || 0;
+  const totalDuration = thinkingSteps
+    ?.filter(s => s.type === 'tool_done' && s.duration)
+    .reduce((sum, s) => sum + (s.duration || 0), 0) || 0;
 
   return (
     <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble, style]}>
@@ -110,6 +124,48 @@ export function MessageBubble({ role, content, answerType, onRetry, isStreaming,
         <Text style={styles.userContent}>{content}</Text>
       ) : (
         <View>
+          {/* 思考过程面板 */}
+          {hasThinkingSteps && (
+            <View style={styles.thinkingContainer}>
+              <Pressable
+                style={styles.thinkingHeader}
+                onPress={() => setThinkingExpanded(!thinkingExpanded)}
+              >
+                <Text style={styles.thinkingToggle}>
+                  {thinkingExpanded ? '▼' : '▶'}
+                </Text>
+                <Text style={styles.thinkingTitle}>
+                  思考过程
+                </Text>
+                <Text style={styles.thinkingSummary}>
+                  ({toolCount} 个工具{toolCount > 0 ? ` · ${totalDuration.toFixed(1)}s` : ''})
+                </Text>
+              </Pressable>
+              {thinkingExpanded && (
+                <View style={styles.thinkingSteps}>
+                  {thinkingSteps.map((step, idx) => (
+                    <View key={idx} style={styles.thinkingStepRow}>
+                      <Text style={styles.thinkingStepIcon}>
+                        {step.type === 'thinking' ? '○' :
+                         step.type === 'tool_start' ? '●' :
+                         step.type === 'tool_done' ? (step.success ? '✓' : '✗') :
+                         '◆'}
+                      </Text>
+                      <Text style={[
+                        styles.thinkingStepText,
+                        step.type === 'tool_done' && !step.success && styles.thinkingStepError,
+                      ]}>
+                        {step.type === 'thinking' ? (step.message || 'AI 正在分析...') :
+                         step.type === 'tool_start' ? (step.display_name || step.tool || '执行工具...') :
+                         step.type === 'tool_done' ? `${step.display_name || step.tool} ${step.success ? '' : '失败'}${step.duration ? ` ${step.duration}s` : ''}` :
+                         step.message || ''}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
           <Markdown style={markdownStyles}>{content}</Markdown>
           {news && news.length > 0 && <NewsCard news={news} />}
           {isStreaming && <Text style={styles.cursor}>|</Text>}
@@ -140,6 +196,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     alignSelf: 'flex-start',
+    overflow: 'hidden',
   },
   headerRow: {
     flexDirection: 'row',
@@ -188,5 +245,56 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textMuted,
     opacity: 0.7,
+  },
+  thinkingContainer: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 8,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
+  },
+  thinkingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.sm,
+    gap: spacing.xs,
+  },
+  thinkingToggle: {
+    fontSize: 12,
+    color: colors.textMuted,
+    width: 16,
+  },
+  thinkingTitle: {
+    ...typography.label,
+    color: colors.textMuted,
+    flex: 1,
+  },
+  thinkingSummary: {
+    ...typography.helper,
+    color: colors.textSubtle,
+  },
+  thinkingSteps: {
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.sm,
+    gap: 4,
+  },
+  thinkingStepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingLeft: spacing.xs,
+  },
+  thinkingStepIcon: {
+    fontSize: 12,
+    width: 14,
+    textAlign: 'center',
+    color: colors.textMuted,
+  },
+  thinkingStepText: {
+    ...typography.helper,
+    color: colors.textMuted,
+    flex: 1,
+  },
+  thinkingStepError: {
+    color: colors.danger,
   },
 });

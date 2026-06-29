@@ -90,7 +90,7 @@ def _write_ask_message(
         return cursor.lastrowid
 
 
-def _get_ask_messages(session_id: str, user_id: str, limit: int = 4) -> list[dict]:
+def _get_ask_messages(session_id: str, user_id: str, limit: int = 6) -> list[dict]:
     with get_connection() as connection:
         rows = connection.execute(
             """

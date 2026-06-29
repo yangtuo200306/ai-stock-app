@@ -45,6 +45,16 @@
   - 错误处理：新路径是否有降级/兜底
   - 配置：是否需要新增环境变量
 
+### 8. JSON 解析必须用 json.loads()
+- 不要用字符串匹配（`'"type":"text"' in sse_event`）判断 JSON 内容
+- `json.dumps` 输出 `"type": "text"`（冒号后有空格），手写条件可能不匹配
+- 必须用 `json.loads()` 正确解析后再判断字段值
+
+### 9. uvicorn --reload 必须加 --reload-dir
+- `uvicorn --reload` 默认监控整个项目目录（含 logs/）
+- 代码有 bug 时日志写入会触发无限重启
+- 必须加 `--reload-dir app` 只监控源码目录
+
 ---
 
 ## 二、项目事实（参考用）
@@ -54,9 +64,10 @@
 - 前端：React Native + Expo + TypeScript
 - 行情源：efinance（主源）+ 新浪（fallback）
 - 新闻源：akshare 东方财富（主源）+ 搜狗（fallback）
-- AI：火山方舟 DeepSeek
+- AI：火山方舟 DeepSeek（支持 Function Calling / Tool Use）
 - 导航：React Navigation 6（Tab + Stack）
 - 状态：Zustand（store）+ AuthContext
+- Agent：Tool Registry + ReAct Loop（v1.9.4+）
 
 ### 产品定位
 AI Stock App 是面向个人投资者的 AI 股票分析助手，不是投资交易软件，也不是完整投研工作台。
@@ -80,6 +91,7 @@ AI Stock App 是面向个人投资者的 AI 股票分析助手，不是投资交
 | `docs/经验记录.md` | 个人经验库 |
 | `docs/common-issues.md` | 常见问题排查 |
 | `docs/overall-roadmap.md` | 总体发展方案 |
+| `docs/v1.9.4-plan.md` | v1.9.4 Agent 实施总结 |
 
 ---
 
